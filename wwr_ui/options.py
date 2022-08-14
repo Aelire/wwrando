@@ -104,6 +104,8 @@ OPTIONS = {
     "Places hints on Old Man Ho Ho. Old Man Ho Ho appears at 10 different islands in the game. Talk to Old Man Ho Ho to get hints.",
   "korl_hints":
     "Places hints on the King of Red Lions. Talk to the King of Red Lions to get hints.",
+  "stone_tablet_hints":
+    "Places hints on Stone Tablets. 30 Stone tablets have been added at various places in the game, read them to get hints.",
   "num_path_hints":
     "The number of path hints that will be placed. Path hints tell you that an area contains an item that is required to reach a particular goal in this seed.<br>"
     "If multiple hint placement options are selected, the hint count will be split evenly among the placement options.",
