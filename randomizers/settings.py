@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import math
 import random
 
 from randomizer import Randomizer
@@ -53,6 +54,7 @@ DEFAULT_WEIGHTS = OrderedDict({
   "sword_mode": [("Start with Hero's Sword", 60), ("No Starting Sword", 35), ("Swordless", 5)],
   "race_mode": [(True, 90), (False, 10)],
   "num_race_mode_dungeons": [(1, 5), (2, 15), (3, 25), (4, 30), (5, 15), (6, 10)],
+  "skip_rematch_bosses": [(True, 75), (False, 25)],
   "randomize_music": [(True, 0), (False, 100)],
   "starting_gear": [
     (["Progressive Picto Box"], 5.6),
@@ -88,15 +90,13 @@ DEFAULT_WEIGHTS = OrderedDict({
   "start_with_maps_and_compasses": [(True, 80), (False, 20)],
 })
 
-# add `skip_rematch_bosses` after initialization to ensure `progression_dungeons` is sampled first
-DEFAULT_WEIGHTS["skip_rematch_bosses"] = [(True, 75), (False, 25)]
-
 # Initial check "cost" is inversely related to likelihood of setting, with a flat cost of 1 for 50/50 settings
 PROGRESSION_SETTINGS_CHECK_COSTS = {
   k: 100 / (2 * v[0][1])
   for k,v in DEFAULT_WEIGHTS.items()
   if k.startswith("progression_")
 }
+TARGET_CHECKS_SLACK = 0.15
 
 DUNGEON_NONPROGRESS_ITEMS = \
   ["DRC Dungeon Map", "DRC Compass"] + \
@@ -123,7 +123,7 @@ def weighted_sample_without_replacement(population, weights, k=1):
         indices.append(i)
   return [population[i] for i in indices]
 
-def randomize_settings(seed=None):
+def randomize_settings(seed=None, target_checks=None):
   random.seed(seed)
   
   settings_dict = {
@@ -145,24 +145,23 @@ def randomize_settings(seed=None):
       continue
     elif option_name == "num_starting_items":
       continue
-    elif option_name == "skip_rematch_bosses":
-      if settings_dict["progression_dungeons"]:
-        chosen_option = True
-      else:
-        chosen_option = random.choices(values, weights=weights)[0]
-      settings_dict["skip_rematch_bosses"] = chosen_option
     else:
       chosen_option = random.choices(values, weights=weights)[0]
       settings_dict[option_name] = chosen_option
   
-  # Randomize starting gear dynamically based on items which have logical implications in this seed
-  settings_dict["starting_gear"] = randomize_starting_gear(settings_dict, seed=seed)
-  
-  target_checks = 150
-  if target_checks > 0: # TODO make this a proper option
+  if target_checks > 0:
     settings_dict = adjust_settings_to_target(settings_dict, target_checks)
 
+  # Randomize starting gear dynamically based on items which have logical implications in this seed
+  settings_dict["starting_gear"] = randomize_starting_gear(settings_dict, seed=seed)
+  adjust_second_pass_options(settings_dict)
+
   return settings_dict
+
+# This is where we can change options that depend on other options
+def adjust_second_pass_options(options):
+  if options["progression_dungeons"]:
+    options["skip_rematch_bosses"] = True
 
 def randomize_starting_gear(options, seed=None):
   starting_gear = ["Telescope", "Ballad of Gales", "Song of Passing"]
@@ -294,11 +293,19 @@ def compute_weighted_locations(settings_dict):
 
     total_cost += dungeon_total_cost
 
-  charts_cost = location_cost("progression_treasure_charts") + location_cost("progression_triforce_charts")
+  triforce_charts_cost = location_cost("progression_triforce_charts")
+  treasure_charts_cost = location_cost("progression_treasure_charts")
   if settings_dict["randomize_charts"]:
     # Symbolic weight boost for randomized charts, but not higher since nobody
     # knows vanilla locations anyway so it doesn't matter
-    total_cost += charts_cost * 0.05 
+    
+    if treasure_charts_cost > 0 and triforce_charts_cost == 0:
+      # Nobody knows all the vanilla locations and we're going only from 41 locations to 49 so not a large change
+      total_cost += treasure_charts_cost * 0.05 
+    elif treasure_charts_cost == 0 and triforce_charts_cost > 0:
+      # In the other direction, triforce charts go from 8 locations to 49, which makes them way worse
+      total_cost += triforce_charts_cost * 0.25
+    # If all the charts were progression anyway, it really doesn't change anything where they are
 
   return total_cost
 
@@ -310,31 +317,43 @@ ADJUSTABLE_SETTINGS = list(PROGRESSION_SETTINGS_CHECK_COSTS.keys()) + [
   # These are special, as they are multivalued
   "sword_mode",
   "randomize_entrances",
-  "num_race_mode_dungeons", "num_race_mode_dungeons", # Since this is the most powerful adjustment, retry it a couple times
+  # "num_race_mode_dungeons", Keep this for the second pass, since it's so likely to go to 6 or 1 unless we're already close to the target
   # Retry flipping dungeons multiple times since other options have impacts on this too
   "progression_dungeons", "progression_dungeons", "progression_dungeons", 
 ]
 def adjust_settings_to_target(settings_dict, target_checks):
-  target_hi, target_lo = int(target_checks * 1.2), int(target_checks * 0.8)
+  target_hi, target_lo = int(target_checks * (1+TARGET_CHECKS_SLACK)), int(target_checks * (1-TARGET_CHECKS_SLACK))
   print(f"Acceptable cost range: {target_lo} to {target_hi}")
   remaining_adjustable_settings = ADJUSTABLE_SETTINGS.copy()
-  second_pass_settings = []
+  second_pass_settings = ["num_race_mode_dungeons", "num_race_mode_dungeons", "num_race_mode_dungeons"]
   second_pass = False
+  bonus_accuracy_toggles = target_checks // 75
   random.shuffle(remaining_adjustable_settings)
 
-  while not (target_lo < (current_cost := compute_weighted_locations(settings_dict)) < target_hi):
-    current_distance = abs(current_cost - target_checks)
-    print(f"At {current_cost}, distance to {target_checks}: {current_distance}")
+  while not (target_lo <= (current_cost := compute_weighted_locations(settings_dict)) <= target_hi) or bonus_accuracy_toggles > 0:
+    if target_lo <= current_cost <= target_hi:
+      print("Final stretch, bonus toggle")
+      bonus_accuracy_toggles -= 1
+      if not second_pass:
+        second_pass = True
+        remaining_adjustable_settings += second_pass_settings
+        random.shuffle(remaining_adjustable_settings)
 
-    if len(remaining_adjustable_settings) > 0 and len(second_pass_settings) > 0 and second_pass is False:
-      remaining_adjustable_settings = second_pass_settings
-      second_pass = True
-    elif len(remaining_adjustable_settings) == 0:
-      print("Could not get within target checks! better luck next time")
-      break
+
+    if len(remaining_adjustable_settings) == 0:
+      if not second_pass:
+        # Ran out of checks. Entering second pass
+        remaining_adjustable_settings = second_pass_settings
+        random.shuffle(remaining_adjustable_settings)
+        second_pass = True
+      else:
+        print("Could not get within target checks! better luck next time")
+        break
 
     selected = remaining_adjustable_settings.pop()
 
+    current_distance = abs(current_cost - target_checks)
+    print(f"At {current_cost}, distance to {target_checks}: {current_distance}")
     print(f"Considering {selected} (currently: {settings_dict[selected]})")
     # Small simplification, if there are only 2 options (yes/no) just try the other one
     # and see if it improves
@@ -342,7 +361,11 @@ def adjust_settings_to_target(settings_dict, target_checks):
     if len(DEFAULT_WEIGHTS[selected]) == 2:
       settings_dict[selected] = not settings_dict[selected]
       new_cost = compute_weighted_locations(settings_dict)
-      if abs(new_cost - target_checks) >= current_distance: # This is not getting us closer, revert
+      if math.isclose(new_cost, current_cost):
+        # Option has no impact, will retry later
+        second_pass_settings.append(selected)
+        settings_dict[selected] = not settings_dict[selected]
+      elif abs(new_cost - target_checks) >= current_distance: # This is not getting us closer, revert
         settings_dict[selected] = not settings_dict[selected]
 
     # For multivalued options, we'll take the "best" one, that takes us closest to the target score
@@ -351,11 +374,21 @@ def adjust_settings_to_target(settings_dict, target_checks):
     # dungeons to be enabled, then this will be retried
     else:
       option_scores = {}
+      original_value = settings_dict[selected]
       for value, _ in DEFAULT_WEIGHTS[selected]:
         settings_dict[selected] = value
         option_scores[value] = abs(compute_weighted_locations(settings_dict) - target_checks)
 
-      settings_dict[selected] = min(option_scores.items(), key=lambda tup: tup[1])[0]
+      # Only change the option if it has an actual impact on checks
+      if math.isclose(min(option_scores.values()), max(option_scores.values())):
+        print(f"Punting on {selected} for now, no impact")
+        second_pass_settings.append(selected)
+        settings_dict[selected] = original_value
+      else:
+        # Often there are multiple minimal options, and min takes the first, so round and shuffle them first
+        possible_values = list(option_scores.items())
+        random.shuffle(possible_values)
+        settings_dict[selected] = min(possible_values, key=lambda tup: int(tup[1]))[0]
 
     print(f"Set {selected} to {settings_dict[selected]}")
 

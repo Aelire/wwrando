@@ -194,7 +194,7 @@ class WWRandomizerWindow(QMainWindow):
     max_attempts = 10
     error_message = ""
     while n_attempts < max_attempts:
-      options = randomize_settings(seed=seed+str(n_attempts))
+      options = randomize_settings(seed=seed+str(n_attempts), target_checks=self.settings["target_checks"])
       for option_name in NON_PERMALINK_OPTIONS:
         options[option_name] = self.get_option_value(option_name)
       
@@ -220,7 +220,7 @@ class WWRandomizerWindow(QMainWindow):
         for i in range(100):
           temp_seed = "RS_" + VERSION + "_" + str(i)
           try:
-            options = randomize_settings(seed=temp_seed)
+            options = randomize_settings(seed=temp_seed, target_checks=self.settings["target_checks"])
             rando = Randomizer(temp_seed, str(i), clean_iso_path, output_folder, options, cmd_line_args=cmd_line_args)
             randomizer_generator = rando.randomize()
             while True:
@@ -353,6 +353,8 @@ class WWRandomizerWindow(QMainWindow):
       self.ui.output_folder.setText(self.settings["output_folder"])
     if "seed" in self.settings:
       self.ui.seed.setText(self.settings["seed"])
+    if "target_checks" in self.settings:
+      self.ui.target_checks.setValue(self.settings["target_checks"])
     
     for option_name in OPTIONS:
       if option_name in self.settings:
@@ -392,6 +394,7 @@ class WWRandomizerWindow(QMainWindow):
     self.settings["clean_iso_path"] = self.ui.clean_iso_path.text()
     self.settings["output_folder"] = self.ui.output_folder.text()
     self.settings["seed"] = self.ui.seed.text()
+    self.settings["target_checks"] = self.ui.target_checks.value()
     
     self.disable_invalid_cosmetic_options()
     

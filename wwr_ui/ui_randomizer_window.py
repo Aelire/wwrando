@@ -18,8 +18,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QPushButton, QScrollArea,
-    QSizePolicy, QSpacerItem, QTabWidget, QTextBrowser,
-    QVBoxLayout, QWidget)
+    QSizePolicy, QSpacerItem, QSpinBox, QTabWidget,
+    QTextBrowser, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -66,6 +66,16 @@ class Ui_MainWindow(object):
 
         self.gridLayout_5.addWidget(self.seed, 2, 1, 1, 1)
 
+        self.target_checks = QSpinBox(self.tab_randomizer_settings)
+        self.target_checks.setObjectName(u"target_checks")
+        self.target_checks.setLayoutDirection(Qt.LeftToRight)
+        self.target_checks.setMaximum(400)
+        self.target_checks.setMinimum(0)
+        self.target_checks.setValue(150)
+        self.target_checks.setDisplayIntegerBase(10)
+
+        self.gridLayout_5.addWidget(self.target_checks, 3, 1, 1, 1)
+
         self.label_for_output_folder = QLabel(self.tab_randomizer_settings)
         self.label_for_output_folder.setObjectName(u"label_for_output_folder")
 
@@ -75,6 +85,11 @@ class Ui_MainWindow(object):
         self.label_for_seed.setObjectName(u"label_for_seed")
 
         self.gridLayout_5.addWidget(self.label_for_seed, 2, 0, 1, 1)
+
+        self.label_for_target_checks = QLabel(self.tab_randomizer_settings)
+        self.label_for_target_checks.setObjectName(u"label_for_target_checks")
+
+        self.gridLayout_5.addWidget(self.label_for_target_checks, 3, 0, 1, 1)
 
         self.generate_seed_button = QPushButton(self.tab_randomizer_settings)
         self.generate_seed_button.setObjectName(u"generate_seed_button")
@@ -347,6 +362,7 @@ class Ui_MainWindow(object):
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">A useful reference to using hints to deduce which settings are enabled can be found here: <a href=\"http://bombch.us/DVy8\"><span style=\" text-decoration: underline; color:#0000ff;\">http://bombch.us/DVy8</span></a></p></body></html>", None))
         self.label_for_output_folder.setText(QCoreApplication.translate("MainWindow", u"Output Folder", None))
         self.label_for_seed.setText(QCoreApplication.translate("MainWindow", u"Seed", None))
+        self.label_for_target_checks.setText(QCoreApplication.translate("MainWindow", u"Target Difficulty", None))
         self.generate_seed_button.setText(QCoreApplication.translate("MainWindow", u"New seed", None))
         self.output_folder_browse_button.setText(QCoreApplication.translate("MainWindow", u"Browse", None))
         self.clean_iso_path_browse_button.setText(QCoreApplication.translate("MainWindow", u"Browse", None))
