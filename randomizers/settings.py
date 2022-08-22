@@ -2,6 +2,7 @@ from collections import OrderedDict
 import random
 
 from randomizer import Randomizer
+from logic.logic import Logic
 from randomizers import items
 
 DEFAULT_WEIGHTS = OrderedDict({
@@ -90,6 +91,13 @@ DEFAULT_WEIGHTS = OrderedDict({
 # add `skip_rematch_bosses` after initialization to ensure `progression_dungeons` is sampled first
 DEFAULT_WEIGHTS["skip_rematch_bosses"] = [(True, 75), (False, 25)]
 
+# Initial check "cost" is inversely related to likelihood of setting, with a flat cost of 1 for 50/50 settings
+PROGRESSION_SETTINGS_CHECK_COSTS = {
+  k: 100 / (2 * v[0][1])
+  for k,v in DEFAULT_WEIGHTS.items()
+  if k.startswith("progression_")
+}
+
 DUNGEON_NONPROGRESS_ITEMS = \
   ["DRC Dungeon Map", "DRC Compass"] + \
   ["FW Dungeon Map", "FW Compass"] + \
@@ -150,6 +158,10 @@ def randomize_settings(seed=None):
   # Randomize starting gear dynamically based on items which have logical implications in this seed
   settings_dict["starting_gear"] = randomize_starting_gear(settings_dict, seed=seed)
   
+  target_checks = 150
+  if target_checks > 0: # TODO make this a proper option
+    settings_dict = adjust_settings_to_target(settings_dict, target_checks)
+
   return settings_dict
 
 def randomize_starting_gear(options, seed=None):
@@ -190,3 +202,164 @@ def randomize_starting_gear(options, seed=None):
     starting_gear += selected_items
   
   return list(set(starting_gear))
+
+def get_incremental_locations_for_setting(cached_item_locations, all_options, incremental_option):
+  options = all_options.copy()
+
+  options[incremental_option] = False
+  before = Logic.get_num_progression_locations_static(cached_item_locations, options)
+  options[incremental_option] = True
+  after = Logic.get_num_progression_locations_static(cached_item_locations, options)
+
+  #print(f"{incremental_option} is {after - before} checks")
+  return after - before
+
+def compute_weighted_locations(settings_dict):
+  cached_item_locations = Logic.load_and_parse_item_locations()
+  location_cost = lambda opt: int(settings_dict[opt]) * get_incremental_locations_for_setting(cached_item_locations, settings_dict, opt)
+
+  # As the base case, we compute a total "cost" which is the number of checks in
+  # a setting times a weight intented to convey the penibility of the setting
+  total_cost = sum(
+    PROGRESSION_SETTINGS_CHECK_COSTS[s] * location_cost(s)
+    for s, value in settings_dict.items() if s.startswith("progression_")
+  )
+
+  combat_caves_cost = location_cost("progression_combat_secret_caves")
+  secret_caves_cost = location_cost("progression_puzzle_secret_caves")
+  if combat_caves_cost+secret_caves_cost > 0 and settings_dict["randomize_entrances"] not in ("Disabled", "Dungeons"):
+    # If only one of combat, secret caves are enabled, randomize entrances is
+    # "worse" as it can get you to an ool location and be a waste of time
+    # If both are enabled, it's not as bad since any entrance is probably a place you'd have needed to visit anyway
+
+    # Since we already counted them as a full 1 in base_weight, this is "on top". so a 1 additional_multiplier is a total of 2 for the weight
+    if combat_caves_cost == 0 or secret_caves_cost == 0:
+      additional_multiplier = 0.75
+      # If dungeons are also in the pool together, but aren't enabled, there's even more dead entrances so bump it a little more
+      if settings_dict["randomize_entrances"] == "Dungeons & Secret Caves (Together)" and not settings_dict["progression_dungeons"]:
+        additional_multiplier = 1
+    else:
+      additional_multiplier = 0.25
+      if settings_dict["randomize_entrances"] == "Dungeons & Secret Caves (Together)" and not settings_dict["progression_dungeons"]:
+        additional_multiplier = 0.40
+
+    total_cost += (combat_caves_cost+secret_caves_cost) * additional_multiplier
+
+  if settings_dict["sword_mode"] == "Swordless":
+    # Bump the cost of combat caves when you have a higher likelihood of having to clear them without sword
+    total_cost += 1 * combat_caves_cost
+  elif settings_dict["sword_mode"] == "No Starting Sword":
+    total_cost += 0.15 * combat_caves_cost
+
+  if settings_dict["progression_dungeons"]:
+    # Adjust for dungeons: If dungeons are on, put a sliding scale from 0.15 to 0.8
+    # depending on the number of race mode dungeons. Ideally we'd be able to
+    # independently select which dungeons we want in logic but that'll do for now
+    # Since each race mode dungeon means one less item in the item pool (boss
+    # reward), each additional dungeon costs "less"
+    # Non-race mode has none of that but you may avoid entering some of the
+    # dungeons so is less than 6DRM
+    DUNGEON_COSTS = [0, 0.20, 0.38, 0.56, 0.74, 0.92, 1.1]
+    dungeon_total_cost = location_cost("progression_dungeons") * PROGRESSION_SETTINGS_CHECK_COSTS["progression_dungeons"]
+    # Remove dungeons from the initial cost calculation; we'll recompute after the multipliers
+    total_cost -= dungeon_total_cost
+    if settings_dict["race_mode"]:
+      # Apply this first, before any other multiplier. ie this is multiplicative while the others are additive
+      dungeon_total_cost *= DUNGEON_COSTS[settings_dict["num_race_mode_dungeons"]]
+    # Keylunacy means more items, and more potential dips in dungeons. Apply a flat multiplier
+    if settings_dict["keylunacy"]:
+      dungeon_total_cost *= 1.2
+    # Small cost bump for dungeons randomized entrances
+    if settings_dict["randomize_entrances"] in ("Dungeons", "Dungeons & Secret Caves (Separately)") :
+      dungeon_total_cost *= 1.05 
+    # Larger cost bump for dungeons randomized together with caves, and even larger if
+    # randomized with entrances to out-of-logic locations without race mode
+    elif settings_dict["randomize_entrances"] == "Dungeons & Secret Caves (Together)":
+      if settings_dict["race_mode"]:
+        # minimal bump: in race mode we know where the entrances are immediately anyway
+        dungeon_total_cost *= 1.05
+      else:
+        dungeon_total_cost *= 1.1
+        # Additional weights for when entrances are mixed with places you don't
+        # need to go to anyway
+        if combat_caves_cost == 0:
+          dungeon_total_cost *= 1.1
+        if secret_caves_cost == 0:
+          dungeon_total_cost *= 1.15
+    # Another bump for missing warp pots
+    if not settings_dict["add_shortcut_warps_between_dungeons"]:
+      dungeon_total_cost *= 1.1
+    if settings_dict["sword_mode"] == "Swordless":
+      dungeon_total_cost *= 1.15
+
+    total_cost += dungeon_total_cost
+
+  charts_cost = location_cost("progression_treasure_charts") + location_cost("progression_triforce_charts")
+  if settings_dict["randomize_charts"]:
+    # Symbolic weight boost for randomized charts, but not higher since nobody
+    # knows vanilla locations anyway so it doesn't matter
+    total_cost += charts_cost * 0.05 
+
+  return total_cost
+
+
+ADJUSTABLE_SETTINGS = list(PROGRESSION_SETTINGS_CHECK_COSTS.keys()) + [
+  "race_mode",
+  "randomize_charts",
+  "add_shortcut_warps_between_dungeons",
+  # These are special, as they are multivalued
+  "sword_mode",
+  "randomize_entrances",
+  "num_race_mode_dungeons", "num_race_mode_dungeons", # Since this is the most powerful adjustment, retry it a couple times
+  # Retry flipping dungeons multiple times since other options have impacts on this too
+  "progression_dungeons", "progression_dungeons", "progression_dungeons", 
+]
+def adjust_settings_to_target(settings_dict, target_checks):
+  target_hi, target_lo = int(target_checks * 1.2), int(target_checks * 0.8)
+  print(f"Acceptable cost range: {target_lo} to {target_hi}")
+  remaining_adjustable_settings = ADJUSTABLE_SETTINGS.copy()
+  second_pass_settings = []
+  second_pass = False
+  random.shuffle(remaining_adjustable_settings)
+
+  while not (target_lo < (current_cost := compute_weighted_locations(settings_dict)) < target_hi):
+    current_distance = abs(current_cost - target_checks)
+    print(f"At {current_cost}, distance to {target_checks}: {current_distance}")
+
+    if len(remaining_adjustable_settings) > 0 and len(second_pass_settings) > 0 and second_pass is False:
+      remaining_adjustable_settings = second_pass_settings
+      second_pass = True
+    elif len(remaining_adjustable_settings) == 0:
+      print("Could not get within target checks! better luck next time")
+      break
+
+    selected = remaining_adjustable_settings.pop()
+
+    print(f"Considering {selected} (currently: {settings_dict[selected]})")
+    # Small simplification, if there are only 2 options (yes/no) just try the other one
+    # and see if it improves
+    # for multivalued options we'll have to try a bit more interestingly
+    if len(DEFAULT_WEIGHTS[selected]) == 2:
+      settings_dict[selected] = not settings_dict[selected]
+      new_cost = compute_weighted_locations(settings_dict)
+      if abs(new_cost - target_checks) >= current_distance: # This is not getting us closer, revert
+        settings_dict[selected] = not settings_dict[selected]
+
+    # For multivalued options, we'll take the "best" one, that takes us closest to the target score
+    # With the exception that if it doesn't change anything, we'll requeue it to retry last
+    # Because all these options affect dungeons, this gives a chance for
+    # dungeons to be enabled, then this will be retried
+    else:
+      option_scores = {}
+      for value, _ in DEFAULT_WEIGHTS[selected]:
+        settings_dict[selected] = value
+        option_scores[value] = abs(compute_weighted_locations(settings_dict) - target_checks)
+
+      settings_dict[selected] = min(option_scores.items(), key=lambda tup: tup[1])[0]
+
+    print(f"Set {selected} to {settings_dict[selected]}")
+
+  print(f"Final cost: {current_cost}")
+  print(f"Final Settings: {settings_dict}")
+  return settings_dict
+
