@@ -231,6 +231,7 @@ def get_incremental_locations_for_setting(cached_item_locations, all_options, in
   return after - before
 
 def compute_weighted_locations(settings_dict):
+  ## TODO: hint location weights
   cached_item_locations = Logic.load_and_parse_item_locations()
   location_cost = lambda opt: int(settings_dict[opt]) * get_incremental_locations_for_setting(cached_item_locations, settings_dict, opt)
 
@@ -273,15 +274,17 @@ def compute_weighted_locations(settings_dict):
     # independently select which dungeons we want in logic but that'll do for now
     # Since each race mode dungeon means one less item in the item pool (boss
     # reward), each additional dungeon costs "less"
-    # Non-race mode has none of that but you may avoid entering some of the
-    # dungeons so is less than 6DRM
-    DUNGEON_COSTS = [0, 0.20, 0.38, 0.56, 0.74, 0.92, 1.1]
+    # The first value is for no race mode
+    DUNGEON_COSTS = [1.5, 0.20, 0.38, 0.56, 0.74, 0.92, 1.1]
     dungeon_total_cost = location_cost("progression_dungeons") * PROGRESSION_SETTINGS_CHECK_COSTS["progression_dungeons"]
     # Remove dungeons from the initial cost calculation; we'll recompute after the multipliers
     total_cost -= dungeon_total_cost
     if settings_dict["race_mode"]:
       # Apply this first, before any other multiplier. ie this is multiplicative while the others are additive
       dungeon_total_cost *= DUNGEON_COSTS[settings_dict["num_race_mode_dungeons"]]
+    else:
+      dungeon_total_cost *= DUNGEON_COSTS[0]
+
     # Keylunacy means more items, and more potential dips in dungeons. Apply a flat multiplier
     if settings_dict["keylunacy"]:
       dungeon_total_cost *= 1.25
@@ -313,15 +316,12 @@ def compute_weighted_locations(settings_dict):
   triforce_charts_cost = location_cost("progression_triforce_charts")
   treasure_charts_cost = location_cost("progression_treasure_charts")
   if settings_dict["randomize_charts"]:
-    # Symbolic weight boost for randomized charts, but not higher since nobody
-    # knows vanilla locations anyway so it doesn't matter
-    
     if treasure_charts_cost > 0 and triforce_charts_cost == 0:
       # Nobody knows all the vanilla locations and we're going only from 41 locations to 49 so not a large change
       total_cost += treasure_charts_cost * 0.05 
     elif treasure_charts_cost == 0 and triforce_charts_cost > 0:
       # In the other direction, triforce charts go from 8 locations to 49, which makes them way worse
-      total_cost += triforce_charts_cost * 0.25
+      total_cost += triforce_charts_cost * 0.5
     # If all the charts were progression anyway, it really doesn't change anything where they are
 
   total_cost *= pow(0.98, settings_dict["num_starting_triforce_shards"])
@@ -329,7 +329,7 @@ def compute_weighted_locations(settings_dict):
   if settings_dict["progression_dungeons"] and settings_dict["race_mode"]:
     non_shard_dungeons = (settings_dict["num_starting_triforce_shards"] + settings_dict["num_race_mode_dungeons"] - 8)
     if non_shard_dungeons > 0:
-      total_cost -= non_shard_dungeons * 2
+      total_cost *= pow(0.98, non_shard_dungeons)
 
   return total_cost
 
@@ -344,7 +344,6 @@ ADJUSTABLE_SETTINGS = list(PROGRESSION_SETTINGS_CHECK_COSTS.keys()) + [
   # Retry flipping dungeons multiple times since other options have impacts on this too
   "progression_dungeons", "progression_dungeons",
   "race_mode", "race_mode",
-  "progression_treasure_charts", "progression_treasure_charts", # This has the highest cost of all so give it more chance to flip
 ]
 def adjust_settings_to_target(settings_dict, target_checks):
   target_hi, target_lo = int(target_checks * (1+TARGET_CHECKS_SLACK)), int(target_checks * (1-TARGET_CHECKS_SLACK))
