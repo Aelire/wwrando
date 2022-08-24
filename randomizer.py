@@ -480,7 +480,7 @@ class Randomizer:
     yield("Writing logs...", options_completed)
     
     if self.randomize_items:
-      if not self.options.get("do_not_generate_spoiler_log"):
+      if not self.options.get("do_not_generate_spoiler_log") or True:
         self.write_spoiler_log()
       
       if self.randobot:

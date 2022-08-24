@@ -216,7 +216,6 @@ class WWRandomizerWindow(QMainWindow):
       cmd_line_args = self.cmd_line_args.copy()
       if self.no_ui_test:
         cmd_line_args["-dry"] = None
-      cmd_line_args["-nologs"] = None
       
       if self.bulk_test:
         failures_done = 0
