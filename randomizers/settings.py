@@ -132,7 +132,7 @@ def weighted_sample_without_replacement(population, weights, k=1):
 def randomize_settings(seed=None, prefilled_options={}):
   random.seed(seed)
 
-  for i, option in enumerate(RNG_CHANGING_OPTIONS):
+  for i, option in enumerate(RNG_CHANGING_OPTIONS + ["target_checks"]):
     value = prefilled_options.get(option, None)
     if value is None:
       continue # Ignore non-prefillable options
@@ -242,7 +242,7 @@ def compute_weighted_locations(settings_dict):
 
   combat_caves_cost = location_cost("progression_combat_secret_caves")
   secret_caves_cost = location_cost("progression_puzzle_secret_caves")
-  if combat_caves_cost+secret_caves_cost > 0 and settings_dict["randomize_entrances"] not in ("Disabled", "Dungeons"):
+  if combat_caves_cost+secret_caves_cost > 0 and "Secret Caves" in settings_dict["randomize_entrances"]:
     # If only one of combat, secret caves are enabled, randomize entrances is
     # "worse" as it can get you to an ool location and be a waste of time
     # If both are enabled, it's not as bad since any entrance is probably a place you'd have needed to visit anyway
@@ -267,9 +267,9 @@ def compute_weighted_locations(settings_dict):
     total_cost += 0.15 * combat_caves_cost
 
   if settings_dict["progression_dungeons"]:
-    # Adjust for dungeons: If dungeons are on, put a sliding scale from 0.15 to 0.8
-    # depending on the number of race mode dungeons. Ideally we'd be able to
-    # independently select which dungeons we want in logic but that'll do for now
+    # Adjust for dungeons: If dungeons are on, put a sliding scale depending on
+    # the number of race mode dungeons. Ideally we'd be able to independently
+    # select which dungeons we want in logic but that'll do for now
     # Since each race mode dungeon means one less item in the item pool (boss
     # reward), each additional dungeon costs "less"
     # The first value is for no race mode
@@ -277,8 +277,11 @@ def compute_weighted_locations(settings_dict):
     dungeon_total_cost = location_cost("progression_dungeons") * PROGRESSION_SETTINGS_CHECK_COSTS["progression_dungeons"]
     # Remove dungeons from the initial cost calculation; we'll recompute after the multipliers
     total_cost -= dungeon_total_cost
+
     if settings_dict["race_mode"]:
       dungeon_total_cost *= DUNGEON_COSTS[settings_dict["num_race_mode_dungeons"]]
+      if settings_dict["only_use_ganondorf_paths"]:
+        dungeon_total_cost *= 1.05
     else:
       dungeon_total_cost *= DUNGEON_COSTS[0]
 
@@ -302,11 +305,18 @@ def compute_weighted_locations(settings_dict):
           dungeon_total_cost *= 1.1
         if secret_caves_cost == 0: # There's more of these
           dungeon_total_cost *= 1.15
-    # Another bump for missing warp pots
+    # Another bump for missing warp pots, scaled by the number of dungeons in logic
     if not settings_dict["add_shortcut_warps_between_dungeons"]:
-      dungeon_total_cost *= 1.1
+      if settings_dict["race_mode"]:
+        dungeon_total_cost *= 1 + 0.025 * settings_dict["num_race_mode_dungeons"]
+      else:
+        dungeon_total_cost *= 1.15
     if settings_dict["sword_mode"] == "Swordless":
       dungeon_total_cost *= 1.15
+    
+    if not settings_dict["start_with_maps_and_compasses"]:
+      # 2 dead items in each dungeon that can be inferred and skipped
+      dungeon_total_cost *= 0.95
 
     total_cost += dungeon_total_cost
 
@@ -324,12 +334,18 @@ def compute_weighted_locations(settings_dict):
 # Below this, modifiers that apply multiplicatively to the total cost rather
 # than adding or removing cost for specific subsets of checks
 
-  total_cost *= pow(0.98, settings_dict["num_starting_triforce_shards"])
-  # Triforce shards that cause other, progression items to show up on bosses are worth more
+  starting_items = settings_dict["num_starting_items"] + settings_dict["num_starting_triforce_shards"]
+
+  # Triforce shards that cause other, progression items to show up on bosses are worth double
   if settings_dict["progression_dungeons"] and settings_dict["race_mode"]:
     non_shard_dungeons = (settings_dict["num_starting_triforce_shards"] + settings_dict["num_race_mode_dungeons"] - 8)
     if non_shard_dungeons > 0:
-      total_cost *= pow(0.98, non_shard_dungeons)
+      starting_items += non_shard_dungeons
+  if settings_dict["sword_mode"] == "Start with Hero's Sword":
+    starting_items += 1
+
+  total_cost *= pow(0.98, starting_items)
+  
 
   # Stone tablet and korl hints can end up on islands we wouldn't otherwise go
   # They also happen much later, so are less useful
@@ -349,12 +365,14 @@ def compute_weighted_locations(settings_dict):
 ADJUSTABLE_SETTINGS = list(PROGRESSION_SETTINGS_CHECK_COSTS.keys()) + [
   "randomize_charts",
   "add_shortcut_warps_between_dungeons",
+  "start_with_maps_and_compasses",
+  "only_use_ganondorf_paths",
   # These are special, as they are multivalued
   "hint_placement",
   "sword_mode",
   "randomize_entrances",
+  "num_starting_triforce_shards",
   "num_race_mode_dungeons",
-  # Retry flipping dungeons multiple times since other options have impacts on this too
   "progression_dungeons", "progression_dungeons",
   "race_mode", "race_mode",
 ]
@@ -362,7 +380,7 @@ def adjust_settings_to_target(settings_dict, target_checks):
   target_hi, target_lo = int(target_checks * (1+TARGET_CHECKS_SLACK)), int(target_checks * (1-TARGET_CHECKS_SLACK))
   print(f"Acceptable cost range: {target_lo} to {target_hi}")
   remaining_adjustable_settings = ADJUSTABLE_SETTINGS.copy()
-  second_pass_settings = ["num_race_mode_dungeons"] * 3 + ["num_starting_triforce_shards"] * 2
+  second_pass_settings = ["num_race_mode_dungeons"] * 3 + ["num_starting_triforce_shards"] * 2 + ["num_starting_items"] * 2
   second_pass = False
   bonus_accuracy_toggles = target_checks // 60
   random.shuffle(remaining_adjustable_settings)
@@ -461,7 +479,7 @@ def ensure_min_max_difficulty(settings_dict, target_checks):
     settings_dict["progression_battlesquid"] = False
 
     if settings_dict["sword_mode"] == "Swordless":
-      settings_dict["sword_mode"] == "No Starting Sword"
+      settings_dict["sword_mode"] = "No Starting Sword"
 
 
   # Put some min and max numbers of race mode dungeons
