@@ -718,14 +718,14 @@ class WWRandomizerWindow(QMainWindow):
           widget.hide()
   
   def open_about(self):
-    text = """Wind Waker Randomizer Version %s<br><br>
-      Created by LagoLunatic<br><br>
-      Report issues here:<br><a href=\"https://github.com/LagoLunatic/wwrando/issues\">https://github.com/LagoLunatic/wwrando/issues</a><br><br>
-      Source code:<br><a href=\"https://github.com/LagoLunatic/wwrando\">https://github.com/LagoLunatic/wwrando</a>""" % VERSION
+    text = """WWR Random Settings Version %s<br><br>
+      Created by LagoLunatic, Random Settings changes by tanjo3, natolumin<br><br>
+      Report issues here:<br><a href=\"https://github.com/Aelire/wwrando/issues\">https://github.com/Aelire/wwrando/issues</a><br><br>
+      Source code:<br><a href=\"https://github.com/Aelire/wwrando\">https://github.com/Aelire/wwrando</a>""" % VERSION
     
     self.about_dialog = QMessageBox()
     self.about_dialog.setTextFormat(Qt.TextFormat.RichText)
-    self.about_dialog.setWindowTitle("Wind Waker Randomizer")
+    self.about_dialog.setWindowTitle("WWR Random Settings")
     self.about_dialog.setText(text)
     self.about_dialog.setWindowIcon(self.windowIcon())
     self.about_dialog.show()
