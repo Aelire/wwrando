@@ -3,7 +3,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 
 from wwr_ui.uic.ui_randomizer_window import Ui_MainWindow
-from wwr_ui.options import OPTIONS, NON_PERMALINK_OPTIONS, HIDDEN_OPTIONS, POTENTIALLY_UNBEATABLE_OPTIONS
+from wwr_ui.options import OPTIONS, NON_PERMALINK_OPTIONS, HIDDEN_OPTIONS, POTENTIALLY_UNBEATABLE_OPTIONS, RANDOM_SETTINGS_OPTIONS
 from wwr_ui.update_checker import check_for_updates, LATEST_RELEASE_DOWNLOAD_PAGE_URL
 from wwr_ui.inventory import INVENTORY_ITEMS, REGULAR_ITEMS, PROGRESSIVE_ITEMS, DEFAULT_STARTING_ITEMS, DEFAULT_RANDOMIZED_ITEMS
 from wwr_ui.packedbits import PackedBitsReader, PackedBitsWriter
@@ -390,8 +390,11 @@ class WWRandomizerWindow(QMainWindow):
     permalink += b"\0"
     
     bitswriter = PackedBitsWriter()
+    settings_randomized = self.get_option_value("randomize_settings")
     for option_name in OPTIONS:
       if option_name in NON_PERMALINK_OPTIONS:
+        continue
+      if settings_randomized and option_name not in RANDOM_SETTINGS_OPTIONS:
         continue
       
       value = self.settings[option_name]
@@ -470,6 +473,9 @@ class WWRandomizerWindow(QMainWindow):
     bitsreader = PackedBitsReader(option_bytes)
     for option_name in OPTIONS:
       if option_name in NON_PERMALINK_OPTIONS:
+        continue
+      if self.get_option_value("randomize_settings") and option_name not in RANDOM_SETTINGS_OPTIONS:
+        # This is a bit hacky, it requires randomize_settings to be the first option in the permalink
         continue
       
       widget = self.findChild(QWidget, option_name)
@@ -706,6 +712,11 @@ class WWRandomizerWindow(QMainWindow):
       print("Gear list invalid, resetting")
       for opt in ["randomized_gear", "starting_gear"]:
         self.set_option_value(opt, self.default_settings[opt])
+
+    # Disable options that the settings randomizer will overwrite to reduce confusion
+    settings_randomized = self.get_option_value("randomize_settings")
+    for option_name in OPTIONS.keys() - RANDOM_SETTINGS_OPTIONS:
+      should_enable_options[option_name] = not settings_randomized
     
     for option_name in OPTIONS:
       widget = self.findChild(QWidget, option_name)

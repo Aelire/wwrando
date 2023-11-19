@@ -1,5 +1,8 @@
 
 OPTIONS = {
+  # Randomize_settings needs to be first because the format of the permalink will change depending on its value (other options may be skipped optionally)
+  "randomize_settings":
+    "Randomize which settings are enabled. When this option is enabled, most other randomization and progression options are disabled, and their value is instead selected randomly by the chosen seed.",
   "progression_dungeons":
     "This controls whether dungeons can contain progress items.<br>"
     "<u>If this is not checked, dungeons will still be randomized</u>, but will only contain optional items you don't need to beat the game.",
@@ -222,4 +225,16 @@ HIDDEN_OPTIONS = [
 
 POTENTIALLY_UNBEATABLE_OPTIONS = [
   "randomize_enemies",
+]
+
+# Options that can still be meaningfully toggled by the user in random settings mode,
+# ie options that won't be overwritten by the settings randomizer. 
+# Used to make it obvious in the UI which options are not used.
+RANDOM_SETTINGS_OPTIONS = NON_PERMALINK_OPTIONS + [
+  "randomize_settings",
+  "do_not_generate_spoiler_log",
+  "instant_text_boxes",
+  "randomize_enemy_palettes",
+  "reveal_full_sea_chart",
+  "remove_music",
 ]
