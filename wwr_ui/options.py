@@ -237,4 +237,6 @@ RANDOM_SETTINGS_OPTIONS = NON_PERMALINK_OPTIONS + [
   "randomize_enemy_palettes",
   "reveal_full_sea_chart",
   "remove_music",
+  "logic_precision",
+  "logic_obscurity",
 ]
