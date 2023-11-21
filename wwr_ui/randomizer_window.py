@@ -20,7 +20,6 @@ from randomizer import WWRandomizer, TooFewProgressionLocationsError, InvalidCle
 from version import VERSION
 from wwrando_paths import SETTINGS_PATH, ASSETS_PATH, IS_RUNNING_FROM_SOURCE
 from seedgen import seedgen
-from randomizers.settings import randomize_settings
 from logic.logic import Logic
 
 class WWRandomizerWindow(QMainWindow):
@@ -193,12 +192,7 @@ class WWRandomizerWindow(QMainWindow):
     self.update_settings()
     
     options = {}
-    user_options = OPTIONS.keys()
-    if self.settings["randomize_settings"]:
-      options = randomize_settings(seed=seed)
-      user_options = RANDOM_SETTINGS_OPTIONS
-
-    for option_name in user_options:
+    for option_name in OPTIONS:
       options[option_name] = self.get_option_value(option_name)
     
     colors = {}

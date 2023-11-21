@@ -45,6 +45,7 @@ from randomizers.boss_reqs import RequiredBossesRandomizer
 from randomizers.hints import HintsRandomizer
 from randomizers.pigs import PigsRandomizer
 from randomizers.starting_item import StartingItemRandomizer
+from randomizers.settings import SettingsRandomizer
 
 from version import VERSION, VERSION_WITHOUT_COMMIT
 
@@ -173,6 +174,7 @@ class WWRandomizer:
     
     self.logic = Logic(self)
     
+    self.random_settings = SettingsRandomizer(self)
     self.items = ItemRandomizer(self)
     self.charts = ChartRandomizer(self)
     self.starting_island = StartingIslandRandomizer(self)
@@ -186,6 +188,8 @@ class WWRandomizer:
     
     # This list's order is the order these randomizers will be called in.
     self.randomizers: list[BaseRandomizer] = [
+      # The settings randomizer is too special and needs to be called before a bunch of other things
+      # self.settings,
       self.charts,
       # self.music,
       self.boss_reqs,
@@ -202,7 +206,31 @@ class WWRandomizer:
       self.items,
       self.hints,
     ]
+  
+  def get_max_progress_length(self) -> int:
+    max_progress_val = 1 # Logic
     
+    if not self.dry_run:
+      max_progress_val += 1 # Applying pre-randomization tweaks.
+  
+    for randomizer in self.randomizers:
+      if randomizer.is_enabled():
+        # TODO: each option should specify its own duration weight
+        max_progress_val += 1 # Randomizing.
+        if not self.dry_run:
+          max_progress_val += 2 # Saving changes.
+    if self.random_settings.is_enabled():
+      # Technically this can enable or disable some other randomizers, which
+      # will mess up the progress bar unless we can reset it
+      max_progress_val += 1
+    
+    if not self.dry_run:
+      max_progress_val += 1 # Applying post-randomization tweaks.
+      max_progress_val += 9 # Saving the ISO.
+    
+    return max_progress_val
+  
+  def init_logic(self):
     self.logic.initialize_from_randomizer_state()
     
     num_progress_locations = self.logic.get_num_progression_locations()
@@ -239,30 +267,21 @@ class WWRandomizer:
     else:
       self.dungeons_and_caves_only_start = False
     self.logic.update_entrance_connection_macros() # Reset the entrance macros.
-    
+
     self.fully_initialized = True
-  
-  def get_max_progress_length(self) -> int:
-    max_progress_val = 0
-    
-    if not self.dry_run:
-      max_progress_val += 1 # Applying pre-randomization tweaks.
-  
-    for randomizer in self.randomizers:
-      if randomizer.is_enabled():
-        # TODO: each option should specify its own duration weight
-        max_progress_val += 1 # Randomizing.
-        if not self.dry_run:
-          max_progress_val += 2 # Saving changes.
-    
-    if not self.dry_run:
-      max_progress_val += 1 # Applying post-randomization tweaks.
-      max_progress_val += 9 # Saving the ISO.
-    
-    return max_progress_val
   
   def randomize(self):
     options_completed = 0
+
+    if self.random_settings.is_enabled():
+      yield("Randomizing settings...", options_completed)
+      self.random_settings.randomize()
+      options_completed += 1
+
+    yield("Initializing logic...", options_completed)
+    self.init_logic()
+    options_completed += 1
+
     yield("Modifying game code...", options_completed)
     
     customizer.decide_on_link_model(self)
