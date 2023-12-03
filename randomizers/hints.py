@@ -126,14 +126,14 @@ class HintsRandomizer(BaseRandomizer):
     self.path_logic_initial_state = None
     
     # Define instance variable shortcuts for hint distribution options.
-    self.max_path_hints = int(self.options.get("num_path_hints", 0))
-    self.max_barren_hints = int(self.options.get("num_barren_hints", 0))
-    self.max_location_hints = int(self.options.get("num_location_hints", 0))
-    self.max_item_hints = int(self.options.get("num_item_hints", 0))
-    self.total_num_hints = self.max_path_hints + self.max_barren_hints + self.max_location_hints + self.max_item_hints
+    self.max_path_hints: int
+    self.max_barren_hints: int
+    self.max_location_hints: int
+    self.max_item_hints: int
+    self.total_num_hints: int
     
-    self.cryptic_hints = self.options.get("cryptic_hints")
-    self.prioritize_remote_hints = self.options.get("prioritize_remote_hints")
+    self.cryptic_hints: bool
+    self.prioritize_remote_hints: bool
     
     self.floor_30_hint: Hint = None
     self.floor_50_hint: Hint = None
@@ -153,11 +153,25 @@ class HintsRandomizer(BaseRandomizer):
     # This will be used to check whether or not the chart leads to a junk item. If so, the chart itself can be
     # considered junk.
     self.chart_name_to_sunken_treasure = {}
+
+  # Late init for settings rando
+  def init_from_randomizer_state(self):
+    # Define instance variable shortcuts for hint distribution options.
+    self.max_path_hints = int(self.options.get("num_path_hints", 0))
+    self.max_barren_hints = int(self.options.get("num_barren_hints", 0))
+    self.max_location_hints = int(self.options.get("num_location_hints", 0))
+    self.max_item_hints = int(self.options.get("num_item_hints", 0))
+    self.total_num_hints = self.max_path_hints + self.max_barren_hints + self.max_location_hints + self.max_item_hints
+    
+    self.cryptic_hints = self.options.get("cryptic_hints", True)
+    self.prioritize_remote_hints = self.options.get("prioritize_remote_hints", False)
+    
   
   def is_enabled(self) -> bool:
     return bool(self.rando.randomize_items)
   
   def _randomize(self):
+    self.init_from_randomizer_state()
     self.path_logic = Logic(self.rando)
     self.path_logic_initial_state = self.path_logic.save_simulated_playthrough_state()
     
