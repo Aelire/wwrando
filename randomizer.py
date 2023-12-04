@@ -20,7 +20,7 @@ from gclib.gcm import GCM
 from gclib.jpc import JPC100
 import tweaks
 from asm import patcher
-from logic.logic import Logic
+from logic.logic import Logic, TooFewProgressionLocationsError # reexported
 from wwlib.charts import ChartList
 from wwrando_paths import DATA_PATH, ASM_PATH, IS_RUNNING_FROM_SOURCE, SEEDGEN_PATH
 import customizer
@@ -67,9 +67,6 @@ RNG_CHANGING_OPTIONS = [
   "do_not_generate_spoiler_log",
   "randomize_settings",
 ]
-
-class TooFewProgressionLocationsError(Exception):
-  pass
 
 class InvalidCleanISOError(Exception):
   pass
@@ -232,18 +229,8 @@ class WWRandomizer:
   
   def init_logic(self):
     self.logic.initialize_from_randomizer_state()
-    
-    num_progress_locations = self.logic.get_num_progression_locations()
-    max_required_bosses_banned_locations = self.logic.get_max_required_bosses_banned_locations()
+    self.logic.check_enough_progression_locations()
     self.all_randomized_progress_items = self.logic.get_flattened_unplaced_progression_items()
-    if num_progress_locations - max_required_bosses_banned_locations < len(self.all_randomized_progress_items):
-      error_message = "Not enough progress locations to place all progress items.\n\n"
-      error_message += "Total progress items: %d\n" % len(self.all_randomized_progress_items)
-      error_message += "Progress locations with current options: %d\n" % num_progress_locations
-      if max_required_bosses_banned_locations > 0:
-        error_message += "Maximum Required Bosses Mode banned locations: %d\n" % max_required_bosses_banned_locations
-      error_message += "\nYou need to check more of the progress location options in order to give the randomizer enough space to place all the items."
-      raise TooFewProgressionLocationsError(error_message)
     
     # We need to determine if the user's selected options result in a dungeons-only-start.
     # Dungeons-only-start meaning that the only locations accessible at the start of the run are dungeon locations.
