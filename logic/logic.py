@@ -14,6 +14,8 @@ from wwrando_paths import LOGIC_PATH
 from randomizers import entrances
 from options.wwrando_options import Options, SwordMode
 
+class TooFewProgressionLocationsError(Exception): pass
+
 class Logic:
   DUNGEON_NAMES = {
     "DRC" : "Dragon Roost Cavern",
@@ -1426,3 +1428,16 @@ class Logic:
         subset_item_combo, orig_req_expression,
         matched_combos, checked_combos,
       )
+
+  def check_enough_progression_locations(self):
+    num_progress_locations = self.get_num_progression_locations()
+    max_required_bosses_banned_locations = self.get_max_required_bosses_banned_locations()
+    all_randomized_progress_items = self.get_flattened_unplaced_progression_items()
+    if num_progress_locations - max_required_bosses_banned_locations < len(all_randomized_progress_items):
+      error_message = "Not enough progress locations to place all progress items.\n\n"
+      error_message += "Total progress items: %d\n" % len(all_randomized_progress_items)
+      error_message += "Progress locations with current options: %d\n" % num_progress_locations
+      if max_required_bosses_banned_locations > 0:
+        error_message += "Maximum Required Bosses Mode banned locations: %d\n" % max_required_bosses_banned_locations
+      error_message += "\nYou need to check more of the progress location options in order to give the randomizer enough space to place all the items."
+      raise TooFewProgressionLocationsError(error_message)
