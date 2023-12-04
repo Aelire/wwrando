@@ -617,7 +617,7 @@ class EntranceRandomizer(BaseRandomizer):
         # backed into a corner where there is no other option left.
         entrances_not_on_unique_islands = [
           en for en in relevant_entrances
-          if en.island_name in self.islands_with_a_banned_dungeon
+          if (outer_entr := self.get_outermost_entrance_for_entrance(en)) and outer_entr.island_name in self.islands_with_a_banned_dungeon
         ]
       else:
         # Prioritize entrances that share an island with an entrance randomized
@@ -625,7 +625,7 @@ class EntranceRandomizer(BaseRandomizer):
         # banned dungeon, reducing our options
         entrances_not_on_unique_islands = [
           en for en in relevant_entrances
-          if en.island_name in self.islands_with_a_required_dungeon
+          if (outer_entr := self.get_outermost_entrance_for_entrance(en)) and outer_entr.island_name in self.islands_with_a_required_dungeon
         ]
       for zone_entrance in entrances_not_on_unique_islands:
         remaining_entrances.remove(zone_entrance)
