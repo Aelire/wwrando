@@ -94,8 +94,6 @@ class WWRandomizer:
     self.logs_output_folder = self.randomized_output_folder
     self.options = options
     self.seed = self.sanitize_seed(seed)
-    self.permalink = self.encode_permalink(self.seed, self.options)
-    self.seed_hash = self.get_seed_hash()
     
     if cmd_line_args is None:
       cmd_line_args = {}
@@ -105,6 +103,8 @@ class WWRandomizer:
     self.disassemble = cmd_line_args.disassemble
     self.export_disc_to_folder = cmd_line_args.exportfolder
     self.no_logs = cmd_line_args.nologs
+    self.randobot = cmd_line_args.randobot
+    compat_version = VERSION_WITHOUT_COMMIT if self.randobot else VERSION
     self.bulk_test = cmd_line_args.bulk
     if self.bulk_test:
       self.dry_run = True
@@ -125,6 +125,8 @@ class WWRandomizer:
     if self.options.do_not_generate_spoiler_log:
       seed_string += SEED_KEY
     
+    self.permalink = self.encode_permalink(self.seed, self.options, pretend_version=compat_version)
+    self.seed_hash = self.get_seed_hash()
     self.integer_seed = self.convert_string_to_integer_md5(seed_string)
     
     self.arcs_by_path: dict[str, RARC] = {}
@@ -380,6 +382,10 @@ class WWRandomizer:
     yield("Writing logs...", progress_completed)
     if not self.options.do_not_generate_spoiler_log:
       self.write_spoiler_log()
+    if self.randobot:
+      if not SEED_KEY or IS_RUNNING_FROM_SOURCE: # Avoids leaking secrets from release builds
+        self.write_spoiler_log()
+      self.write_randobot_files()
     self.write_non_spoiler_log()
   
   def apply_necessary_tweaks(self):
@@ -475,11 +481,13 @@ class WWRandomizer:
     return seed
   
   @classmethod
-  def encode_permalink(cls, seed: str, options: Options):
+  def encode_permalink(cls, seed: str, options: Options, pretend_version: str | None = None):
     seed = cls.sanitize_seed(seed)
+
+    version = pretend_version or VERSION
     
     permalink = b""
-    permalink += VERSION.encode("ascii")
+    permalink += version.encode("ascii")
     permalink += b"\0"
     permalink += seed.encode("ascii")
     permalink += b"\0"
@@ -997,7 +1005,7 @@ class WWRandomizer:
   def get_log_header(self):
     header = ""
     
-    header += "Wind Waker Randomizer Version %s\n" % VERSION
+    header += "Wind Waker Randomizer Version %s\n" % (VERSION_WITHOUT_COMMIT if self.randobot else VERSION)
     
     if self.permalink:
       header += "Permalink: %s\n" % self.permalink
@@ -1077,6 +1085,8 @@ class WWRandomizer:
     
     os.makedirs(self.logs_output_folder, exist_ok=True)
     spoiler_log_output_path = os.path.join(self.logs_output_folder, "WW Random %s - Spoiler Log.txt" % self.seed)
+    if self.randobot:
+      spoiler_log_output_path = os.path.join(self.logs_output_folder, "spoiler_log_%s.txt" % self.seed)
     with open(spoiler_log_output_path, "w") as f:
       f.write(spoiler_log)
   
@@ -1096,6 +1106,16 @@ class WWRandomizer:
     error_log_output_path = os.path.join(self.logs_output_folder, "WW Random %s - Error Log.txt" % self.seed)
     with open(error_log_output_path, "w") as f:
       f.write(error_log_str)
+
+  def write_randobot_files(self):
+    files: dict[str, Callable[[], str]] = {
+      "seed_hash_%s.txt": self.get_seed_hash,
+      "permalink_%s.txt": lambda: self.permalink,
+      # "spoiler_log_%s.txt": self.get_spoiler_log, # Monkeypatched in write_spoiler_log instead
+    }
+    for fname, gen in files.items():
+      with open(os.path.join(self.randomized_output_folder, fname % self.seed), "w") as f:
+        f.write(gen())
   
   def disassemble_all_code(self):
     disassemble.disassemble_all_code(self)

@@ -101,6 +101,10 @@ def make_argparser() -> argparse.ArgumentParser:
     '--profile', action='store_true',
     help="Profile the randomization code and store the results to a file.",
   )
+  parser.add_argument(
+    '--randobot', action='store_true',
+    help="Tweak outputs and accepted inputs for use in a the racetime bot (https://github.com/wooferzfg/tww-rando-bot)"
+  )
   
   return parser
 
@@ -197,7 +201,7 @@ def run_no_ui(args):
   seed = settings["seed"]
   
   if args.permalink:
-    seed, options = WWRandomizer.decode_permalink(args.permalink, options)
+    seed, options = WWRandomizer.decode_permalink(args.permalink, options, allow_different_commit=args.randobot)
   
   if args.seed:
     seed = args.seed
