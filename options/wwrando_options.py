@@ -1,21 +1,21 @@
 from dataclasses import dataclass, KW_ONLY
-from enum import StrEnum
+from enum import Enum
 from typing import override
 
 from options.base_options import BaseOptions, option
 
 from wwr_ui.inventory import DEFAULT_STARTING_ITEMS, DEFAULT_RANDOMIZED_ITEMS
 
-class SwordMode(StrEnum):
+class SwordMode(str, Enum):
   START_WITH_SWORD = "Start with Hero's Sword"
   NO_STARTING_SWORD = "No Starting Sword"
   SWORDLESS = "Swordless"
 
-class EntranceMixMode(StrEnum):
+class EntranceMixMode(str, Enum):
   SEPARATE_DUNGEONS = "Separate Dungeons From Caves & Fountains"
   MIX_DUNGEONS = "Mix Dungeons & Caves & Fountains"
 
-class TrickDifficulty(StrEnum):
+class TrickDifficulty(str, Enum):
   NONE = "None"
   NORMAL = "Normal"
   HARD = "Hard"

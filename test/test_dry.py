@@ -1,7 +1,7 @@
 from wwrando import make_argparser
 from randomizer import WWRandomizer
 from options.wwrando_options import Options, SwordMode, EntranceMixMode, TrickDifficulty
-from enum import StrEnum
+from enum import Enum
 
 def dry_rando_with_options(options) -> WWRandomizer:
   args = make_argparser().parse_args(args=["--dry", "--nologs"])
@@ -157,7 +157,7 @@ def test_parse_string_option_to_enum():
   options = Options()
   options.logic_precision = "Normal"
   rando = dry_rando_with_options(options)
-  assert isinstance(rando.options.logic_precision, StrEnum)
+  assert isinstance(rando.options.logic_precision, Enum)
 
 def test_convert_options_to_dict_and_back():
   default_options = Options()

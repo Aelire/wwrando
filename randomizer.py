@@ -23,7 +23,7 @@ from packedbits import PackedBitsReader, PackedBitsWriter
 import base64
 import struct
 import typing
-from enum import StrEnum
+from enum import Enum
 
 try:
   from keys.seed_key import SEED_KEY # type: ignore
@@ -508,7 +508,7 @@ class WWRandomizer:
       
       if issubclass(option.type, bool):
         bitswriter.write(int(value), 1)
-      elif issubclass(option.type, StrEnum):
+      elif issubclass(option.type, Enum):
         enum_values = [val for val in option.type]
         index_of_value = enum_values.index(value)
         maximum_index = len(enum_values) - 1
@@ -580,7 +580,7 @@ class WWRandomizer:
       if issubclass(option.type, bool):
         boolean_value = bool(bitsreader.read(1))
         options[option.name] = boolean_value
-      elif issubclass(option.type, StrEnum):
+      elif issubclass(option.type, Enum):
         enum_values = [val for val in option.type]
         maximum_index = len(enum_values) - 1
         max_bit_length = maximum_index.bit_length()

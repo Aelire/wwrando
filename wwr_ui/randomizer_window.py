@@ -9,7 +9,7 @@ from wwr_ui.inventory import INVENTORY_ITEMS, DEFAULT_STARTING_ITEMS, DEFAULT_RA
 import os
 import yaml
 import traceback
-from enum import StrEnum
+from enum import Enum
 from collections import Counter
 
 from options.wwrando_options import Options, SwordMode
@@ -305,7 +305,7 @@ class WWRandomizerWindow(QMainWindow):
       elif isinstance(widget, QComboBox):
         assert issubclass(option.type, str)
         if widget.objectName() not in ["custom_player_model", "custom_color_preset"]:
-          assert issubclass(option.type, StrEnum)
+          assert issubclass(option.type, Enum)
           assert widget.count() == len(option.type)
           for i, enum_value in enumerate(option.type):
             # Make sure the text of each choice in the combobox matches the string enum value of the option.
@@ -526,7 +526,7 @@ class WWRandomizerWindow(QMainWindow):
   def update_choice_highlighted_description(self, index):
     option = self.get_option_from_widget(self.sender())
     assert option
-    assert issubclass(option.type, StrEnum)
+    assert issubclass(option.type, Enum)
     enum_values = [val for val in option.type]
     highlighted_value = enum_values[index]
     
@@ -546,7 +546,7 @@ class WWRandomizerWindow(QMainWindow):
     if isinstance(widget, QCheckBox) or isinstance(widget, QRadioButton):
       return widget.isChecked()
     elif isinstance(widget, QComboBox):
-      if issubclass(option.type, StrEnum):
+      if issubclass(option.type, Enum):
         index = widget.currentIndex()
         enum_values = [val for val in option.type]
         curr_value = enum_values[index]
@@ -581,7 +581,7 @@ class WWRandomizerWindow(QMainWindow):
       widget.setChecked(bool(new_value))
     elif isinstance(widget, QComboBox):
       index_of_value = None
-      if issubclass(option.type, StrEnum) and isinstance(new_value, option.type):
+      if issubclass(option.type, Enum) and isinstance(new_value, option.type):
         enum_values = [val for val in option.type]
         index_of_value = enum_values.index(new_value)
       elif isinstance(new_value, str):
@@ -841,6 +841,6 @@ class UpdateCheckerThread(QThread):
 
 # Allows PyYAML to dump StrEnums as strings.
 yaml.Dumper.add_multi_representer(
-  StrEnum,
+  Enum,
   lambda dumper, data: dumper.represent_scalar('tag:yaml.org,2002:str', str(data.value))
 )
