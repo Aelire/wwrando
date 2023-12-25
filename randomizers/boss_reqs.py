@@ -1,10 +1,7 @@
 from collections import Counter
 
 from randomizers.base_randomizer import BaseRandomizer
-from gclib import fs_helpers as fs
-from wwlib.dzx import DZx, ACTR, TGOB, SCOB
 from tweaks import switches_are_contiguous
-from gclib.bmg import TextBoxType
 
 BOSS_NAME_TO_SEA_CHART_QUEST_MARKER_INDEX = {
   "Gohma"        : 7,

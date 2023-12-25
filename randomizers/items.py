@@ -4,10 +4,7 @@ import re
 
 from logic.logic import Logic
 
-from gclib import fs_helpers as fs
 from randomizers.base_randomizer import BaseRandomizer
-from wwlib.dzx import DZx, ACTR, SCOB, TRES, DZxLayer
-from wwlib.events import EventList
 from tweaks import add_trap_chest_event_to_stage
 
 class ItemRandomizer(BaseRandomizer):
@@ -439,7 +436,7 @@ class ItemRandomizer(BaseRandomizer):
     rel = self.rando.get_rel(path)
     rel.write_data(fs.write_u8, offset, item_id)
 
-  def change_chest_item(self, arc_path: str, chest_index: int, layer: DZxLayer, item_name: str):
+  def change_chest_item(self, arc_path: str, chest_index: int, layer, item_name: str):
     if arc_path.endswith("Stage.arc"):
       dzx = self.rando.get_arc(arc_path).get_file("stage.dzs", DZx)
     else:
@@ -497,7 +494,7 @@ class ItemRandomizer(BaseRandomizer):
       action.name = "011get_item"
       action.properties[0].value = [item_id]
 
-  def change_scob_item(self, arc_path: str, scob_index: int, layer: DZxLayer, item_name: str):
+  def change_scob_item(self, arc_path: str, scob_index: int, layer, item_name: str):
     item_id = self.rando.item_name_to_id[item_name]
     
     if arc_path.endswith("Stage.arc"):
@@ -512,7 +509,7 @@ class ItemRandomizer(BaseRandomizer):
     else:
       raise Exception("%s/SCOB%03X is an unknown type of SCOB" % (arc_path, scob_index))
 
-  def change_actor_item(self, arc_path: str, actor_index: int, layer: DZxLayer, item_name: str):
+  def change_actor_item(self, arc_path: str, actor_index: int, layer, item_name: str):
     item_id = self.rando.item_name_to_id[item_name]
     
     if arc_path.endswith("Stage.arc"):

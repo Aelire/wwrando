@@ -9,22 +9,11 @@ from typing import TypeVar, Callable
 from io import BytesIO
 import string
 
-from gclib import fs_helpers as fs
-from gclib.bfn import BFN
-from gclib.bmg import BMG
-from gclib.yaz0 import Yaz0
-from gclib.rarc import RARC
-from gclib.dol import DOL
-from gclib.rel import REL, RELRelocation, RELRelocationType
-from gclib.gcm import GCM
-from gclib.jpc import JPC100
 import tweaks
 from asm import patcher
 from logic.logic import Logic, TooFewProgressionLocationsError # reexported
-from wwlib.charts import ChartList
 from wwrando_paths import DATA_PATH, ASM_PATH, IS_RUNNING_FROM_SOURCE, SEEDGEN_PATH
 import customizer
-from wwlib import stage_searcher
 from asm import disassemble
 from asm import elf2rel
 

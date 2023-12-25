@@ -14,7 +14,6 @@ import sys
 asm_dir = os.path.dirname(__file__)
 
 sys.path.insert(0, asm_dir + "/../gclib")
-from gclib import fs_helpers as fs
 from elf import ELF, ELFSectionType, ELFRelocationType, ELFSectionFlags, ElfSymbolBinding
 
 if sys.platform == "win32":

@@ -3,9 +3,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
   from randomizer import WWRandomizer
 
-from gclib.bti import BTI
-from gclib.j3d import BDL
-
 import re
 import os
 from io import BytesIO
@@ -14,18 +11,11 @@ import copy
 import math
 import colorsys
 
-from gclib import fs_helpers as fs
 from asm import patcher
-from gclib import texture_utils
-from gclib.rel import REL
-from gclib.bmg import TextBoxType
-import gclib.gx_enums as GX
 from wwrando_paths import ASSETS_PATH, ASM_PATH
 import customizer
 from logic.item_types import PROGRESS_ITEMS, NONPROGRESS_ITEMS, CONSUMABLE_ITEMS, DUPLICATABLE_CONSUMABLE_ITEMS
 from data_tables import DataTables
-from wwlib.events import EventList
-from wwlib.dzx import DZx, ACTR, EVNT, FILI, PLYR, SCLS, SCOB, SHIP, TGDR, TRES, Pale
 from options.wwrando_options import SwordMode
 
 try:

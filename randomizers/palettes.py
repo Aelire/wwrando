@@ -3,18 +3,6 @@ import os
 import yaml
 from io import BytesIO
 
-from gclib import fs_helpers as fs
-from gclib import texture_utils
-from gclib.bti import BTI
-from gclib.j3d import J3D
-from gclib.j3d_chunks.mat3 import MAT3
-from gclib.j3d_chunks.mdl3 import MDL3, BPRegister
-from gclib.j3d_chunks.tex1 import TEX1
-from gclib.j3d_chunks.trk1 import TRK1, ColorAnimation
-from gclib.jpa import JParticle100
-from gclib.rel import REL
-import gclib.gx_enums as GX
-
 from randomizers.base_randomizer import BaseRandomizer
 from wwrando_paths import DATA_PATH
 
@@ -137,7 +125,7 @@ class PaletteRandomizer(BaseRandomizer):
           
           j3d_file.save()
   
-  def shift_all_colors_in_tex1(self, file_name, tex1: TEX1, h_shift, v_shift):
+  def shift_all_colors_in_tex1(self, file_name, tex1, h_shift, v_shift):
     for texture_name in tex1.textures_by_name:
       if "toon" in texture_name:
         # Special texture related to lighting
@@ -189,7 +177,7 @@ class PaletteRandomizer(BaseRandomizer):
       image = texture_utils.hsv_shift_image(image, h_shift, v_shift)
       texture.replace_image(image)
   
-  def shift_all_colors_in_mat3(self, file_name, mat3: MAT3, h_shift, v_shift):
+  def shift_all_colors_in_mat3(self, file_name, mat3, h_shift, v_shift):
     for material in mat3.materials:
       for col in material.tev_colors:
         if any(c < 0 for c in col.rgb):
@@ -200,7 +188,7 @@ class PaletteRandomizer(BaseRandomizer):
       for col in material.tev_konst_colors:
         col.rgb = texture_utils.hsv_shift_color(col.rgb, h_shift, v_shift)
   
-  def shift_all_colors_in_mdl3(self, file_name, mdl3: MDL3, h_shift, v_shift):
+  def shift_all_colors_in_mdl3(self, file_name, mdl3, h_shift, v_shift):
     for entry in mdl3.entries:
       tev_color_commands = [
         com for com in entry.bp_commands
@@ -243,7 +231,7 @@ class PaletteRandomizer(BaseRandomizer):
         hi_command.value |= ((b <<  0) & 0x0007FF)
         lo_command.value |= ((a << 12) & 0x7FF000)
   
-  def shift_all_colors_in_trk1(self, file_name, trk1: TRK1, h_shift, v_shift):
+  def shift_all_colors_in_trk1(self, file_name, trk1, h_shift, v_shift):
     animations: list[ColorAnimation] = []
     for mat_name, anims in trk1.mat_name_to_reg_anims.items():
       animations += anims
@@ -296,7 +284,7 @@ class PaletteRandomizer(BaseRandomizer):
         if b_keyframe:
           b_keyframe.value = b
   
-  def shift_all_colors_in_particle(self, particle: JParticle100, h_shift, v_shift):
+  def shift_all_colors_in_particle(self, particle, h_shift, v_shift):
     #print("%04X" % particle_id)
     #print(particle.tdb1.texture_filenames)
     
@@ -327,7 +315,7 @@ class PaletteRandomizer(BaseRandomizer):
       particle.ssp1.color_prm.rgb = texture_utils.hsv_shift_color(particle.ssp1.color_prm.rgb, h_shift, v_shift)
       particle.ssp1.color_env.rgb = texture_utils.hsv_shift_color(particle.ssp1.color_env.rgb, h_shift, v_shift)
   
-  def shift_hardcoded_color_in_rel(self, rel: REL, offset, h_shift, v_shift):
+  def shift_hardcoded_color_in_rel(self, rel, offset, h_shift, v_shift):
     r = rel.read_data(fs.read_u8, offset + 0)
     g = rel.read_data(fs.read_u8, offset + 1)
     b = rel.read_data(fs.read_u8, offset + 2)

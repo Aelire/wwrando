@@ -18,7 +18,6 @@ import traceback
 
 from wwrando_paths import ASSETS_PATH, CUSTOM_MODELS_PATH
 import customizer
-from gclib import texture_utils
 
 class CosmeticTab(QWidget):
   def __init__(self):

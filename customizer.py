@@ -10,12 +10,6 @@ from io import BytesIO
 import glob
 from PIL import Image
 
-from gclib import fs_helpers as fs
-from gclib import texture_utils
-from gclib.bti import BTI
-from gclib.j3d import BDL
-from gclib.j3d import BRK
-import gclib.gx_enums as GX
 from wwrando_paths import ASSETS_PATH, CUSTOM_MODELS_PATH
 
 ORIG_LINK_ARC_FILE_SIZE_IN_BYTES  = 1308608

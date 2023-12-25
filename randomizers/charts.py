@@ -2,7 +2,6 @@
 import copy
 
 from randomizers.base_randomizer import BaseRandomizer
-from wwlib.dzx import DZx, SCOB
 
 class ChartRandomizer(BaseRandomizer):
   """Shuffles around which chart points to each sector."""

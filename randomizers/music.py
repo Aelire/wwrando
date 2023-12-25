@@ -1,6 +1,3 @@
-
-from gclib import fs_helpers as fs
-
 from randomizers.music_constants import *
 
 def randomize_music(self):

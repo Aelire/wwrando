@@ -2,8 +2,6 @@
 from enum import Enum
 from io import BytesIO
 
-from gclib import fs_helpers as fs
-
 class ELF:
   def read_from_file(self, file_path):
     with open(file_path, "rb") as f:

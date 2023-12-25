@@ -3,8 +3,6 @@ import re
 from typing import ClassVar
 from collections import defaultdict
 
-from wwlib.dzx import DZx, _2DMA, ACTR, PLYR, SCLS, STAG
-from wwlib.events import EventList
 from randomizers.base_randomizer import BaseRandomizer
 from options.wwrando_options import EntranceMixMode
 

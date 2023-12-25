@@ -1,6 +1,3 @@
-
-from gclib import fs_helpers as fs
-from gclib.rel import REL, RELSection, RELRelocation, RELRelocationType
 from asm.elf import ELF, ELFSectionType, ELFSectionFlags, ELFRelocationType, ELFSymbolSpecialSection
 
 ALLOWED_SECTIONS = [

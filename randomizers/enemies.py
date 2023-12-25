@@ -6,9 +6,7 @@ import math
 import yaml
 
 from randomizers.base_randomizer import BaseRandomizer
-from wwlib import stage_searcher
 from logic.logic import Logic
-from wwlib.dzx import DZx, ACTR, DOOR, FILI, RPAT, SCOB, STAG, TGDR, DZxLayer
 from wwrando_paths import DATA_PATH
 
 # This variable is for debugging specific enemies.

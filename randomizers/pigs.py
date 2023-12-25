@@ -1,6 +1,3 @@
-
-from gclib import fs_helpers as fs
-
 from randomizers.base_randomizer import BaseRandomizer
 
 class PigsRandomizer(BaseRandomizer):
