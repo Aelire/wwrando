@@ -393,7 +393,8 @@ class WWRandomizerWindow(QMainWindow):
     for option in Options.all:
       self.settings[option.name] = self.get_option_value(option.name)
     
-    self.save_settings()
+    if not self.cmd_line_args.randobot:
+      self.save_settings()
     
     self.encode_permalink()
     
