@@ -749,10 +749,6 @@ class WWRandomizerWindow(QMainWindow):
       self.update_checker_thread.wait()
     event.accept()
   
-  if TYPE_CHECKING:
-    # Fake override for type checker because PySide6 doesn't use TypeVar.
-    def findChild[T](self, type: Type[T], name: str = ..., options: Qt.FindChildOption = ...) -> T: ...
-
 class ModelFilterOut(QSortFilterProxyModel):
   def __init__(self):
     super(ModelFilterOut, self).__init__()

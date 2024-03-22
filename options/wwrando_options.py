@@ -1,6 +1,5 @@
 from dataclasses import dataclass, KW_ONLY
 from enum import Enum
-from typing import override
 
 from options.base_options import BaseOptions, option
 
@@ -31,7 +30,6 @@ class Options(BaseOptions):
     random_settings_togglable=True,
   )
 
-  @override
   def validate(self):
     super().validate()
     if self.randomize_settings:
