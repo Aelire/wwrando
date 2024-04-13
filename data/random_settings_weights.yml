@@ -1,0 +1,176 @@
+---
+default:
+  weights:
+    - name: dungeons_combo
+      combo:
+        - progression_dungeons
+        - skip_rematch_bosses
+        - required_bosses
+      choices: !!omap
+        - ["progression_dungeons", "skip_rematch_bosses", "required_bosses"]: 72%
+        - ["progression_dungeons", "skip_rematch_bosses"]: 8%
+        - ["skip_rematch_bosses"]: 75/500
+        - []: 25/500
+    - name: progression_great_fairies
+      weight: 50%
+    - name: progression_puzzle_secret_caves
+      weight: 50%
+    - name: progression_combat_secret_caves
+      weight: 50%
+    - name: progression_short_sidequests
+      weight: 50%
+    - name: progression_long_sidequests
+      weight: 20%
+    - name: progression_spoils_trading
+      weight: 10%
+    - name: progression_minigames
+      weight: 50%
+    - name: progression_free_gifts
+      weight: 80%
+    - name: progression_mail
+      weight: 50%
+    - name: progression_platforms_rafts
+      weight: 50%
+    - name: progression_submarines
+      weight: 50%
+    - name: progression_eye_reef_chests
+      weight: 50%
+    - name: progression_big_octos_gunboats
+      weight: 50%
+    - name: progression_triforce_charts
+      weight: 20%
+    - name: progression_treasure_charts
+      weight: 5%
+    - name: progression_expensive_purchases
+      weight: 20%
+    - name: progression_misc
+      weight: 50%
+    - name: progression_tingle_chests
+      weight: 50%
+    - name: progression_battlesquid
+      weight: 20%
+    - name: progression_savage_labyrinth
+      weight: 35%
+    - name: progression_island_puzzles
+      weight: 50%
+    - name: progression_dungeon_secrets
+      weight: 50%
+
+    - name: keylunacy
+      weight: 40%
+    - name: randomize_dungeon_entrances
+      weight: 50%
+    - name: randomize_secret_cave_entrances
+      weight: 30%
+    - name: randomize_secret_cave_inner_entrances
+      weight: 50%
+    - name: randomize_boss_entrances
+      weight: 50%
+    - name: randomize_miniboss_entrances
+      weight: 50%
+    - name: randomize_fairy_fountain_entrances
+      weight: 50%
+    - name: mix_entrances
+      choices:
+        "Separate Dungeons From Caves & Fountains": 3/4
+        "Mix Dungeons & Caves & Fountains": 1/4
+    - name: randomize_charts
+      weight: 50%
+    - name: randomize_starting_island
+      weight: 100%
+    - name: chest_type_matches_contents
+      weight: 100%
+
+    - name: num_path_hints
+      choices:
+        6: 100%
+    - name: num_barren_hints
+      choices:
+        6: 100%
+    - name: num_location_hints
+      choices:
+        8: 100%
+    - name: num_item_hints
+      choices:
+        0: 100%
+    - name: cryptic_hints
+      weight: 0
+    - name: prioritize_remote_hints
+      weight: 100%
+    - name: swift_sail
+      weight: 100%
+    - name: num_starting_triforce_shards
+      choices:
+        0: 60%
+        1: 9%
+        2: 8%
+        3: 8%
+        4: 5%
+        5: 5%
+        6: 2%
+        7: 2%
+        8: 1%
+    - name: add_shortcut_warps_between_dungeons
+      weight: 80%
+    - name: sword_mode
+      choices:
+        "Start with Hero's Sword": 60%
+        "No Starting Sword": 35%
+        "Swordless": 5%
+    - name: num_required_bosses
+      choices:
+        1: 5%
+        2: 15%
+        3: 25%
+        4: 30%
+        5: 15%
+        6: 10%
+    - name: starting_pohs
+      choices:
+        0: 100%
+    - name: starting_hcs
+      choices:
+        3: 100%
+    - name: randomize_enemies
+      weight: 0%
+
+    - name: trap_chests
+      weight: 50%
+    - name: hint_placement
+      combo: ["fishmen_hints", "hoho_hints", "korl_hints", "stone_tablet_hints"]
+      choices: !!omap
+        - ["hoho_hints"]: 10%
+        - ["korl_hints"]: 80%
+        - ["stone_tablet_hints"]: 10%
+    - name: num_extra_starting_items
+      choices:
+        0: 25%
+        1: 40%
+        2: 25%
+        3: 10%
+    # When starting_gear is randomized, randomized_gear is also managed by the settings randomizer
+    # and cannot be set by the user anymore
+    - name: randomized_gear
+      disable:
+      managed: true
+    - name: starting_gear
+      choices: !!omap
+        - ["Telescope", "Ballad of Gales", "Song of Passing"]: 20%
+        - ? [
+              "Telescope",
+              "Ballad of Gales",
+              "Song of Passing",
+              "DRC Dungeon Map",
+              "DRC Compass",
+              "FW Dungeon Map",
+              "FW Compass",
+              "TotG Dungeon Map",
+              "TotG Compass",
+              "FF Dungeon Map",
+              "FF Compass",
+              "ET Dungeon Map",
+              "ET Compass",
+              "WT Dungeon Map",
+              "WT Compass",
+            ]
+          : 80%
