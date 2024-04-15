@@ -1201,6 +1201,31 @@
              </widget>
             </item>
             <item>
+             <widget class="QGroupBox" name="groupBox_random_settings">
+              <property name="title">
+               <string>Settings Randomizer</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayout_random_settings">
+               <item row="0" column="3">
+                <widget class="QWidget" name="widget_rs_enable" native="true"/>
+               </item>
+               <item row="0" column="0">
+                <widget class="QCheckBox" name="randomize_settings">
+                 <property name="text">
+                  <string>Randomize Settings</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="2">
+                <widget class="QWidget" name="widget_rs_placeholder1" native="true"/>
+               </item>
+               <item row="0" column="4">
+                <widget class="QWidget" name="widget_rs_placeholder2" native="true"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
              <spacer name="verticalSpacer_3">
               <property name="orientation">
                <enum>Qt::Orientation::Vertical</enum>
@@ -1422,6 +1447,7 @@
   <tabstop>prioritize_remote_hints</tabstop>
   <tabstop>do_not_generate_spoiler_log</tabstop>
   <tabstop>dry_run</tabstop>
+  <tabstop>randomize_settings</tabstop>
  </tabstops>
  <resources/>
  <connections/>
