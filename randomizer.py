@@ -91,6 +91,7 @@ class WWRandomizer:
     self.fully_initialized = False
     
     options.validate()
+    SettingsRandomizer.normalize_options(options)
     
     self.randomized_output_folder = randomized_output_folder
     self.logs_output_folder = self.randomized_output_folder

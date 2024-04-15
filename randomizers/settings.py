@@ -2,6 +2,7 @@ from typing import override
 
 from logic.logic import Logic, TooFewProgressionLocationsError
 from options.randomized.weight_sets import WeightSet, parse_weight_data
+from options.wwrando_options import Options
 from randomizers.base_randomizer import BaseRandomizer
 
 
@@ -29,6 +30,14 @@ class SettingsRandomizer(BaseRandomizer):
         if not cls._weights:
             cls._weights = parse_weight_data()
         return cls._weights[section]
+
+    @classmethod
+    def normalize_options(cls, options: Options):
+        if options.randomize_settings:
+            all_default_values = Options()
+            for option in options.all:
+                if cls.weights("default").is_managed(option):
+                    options[option.name] = all_default_values[option.name]
 
     def select_settings(self) -> None:
         assert self.rng
