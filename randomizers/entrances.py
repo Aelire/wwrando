@@ -606,6 +606,19 @@ class EntranceRandomizer(BaseRandomizer):
       nonprogress_island_entrance = possible_island_entrances.pop(0)
       nonprogress_entrances.append(nonprogress_island_entrance)
     
+    if len(nonprogress_exits) < len(nonprogress_entrances):
+      # In this case, we promote an entrance to progression. This means players will need to traverse a
+      # nonprogress location to get to progress locations, so we want to use the smallest possible
+      # entrances, ie force it to be a puzzle cave if possible
+      # This is only known to happen (so far) for Inner Entrance in Cliff Plateau Island Cave when
+      # Long Sidequests are enabled (pulling in Withered Trees)
+      num_promoted_entrances = len(nonprogress_entrances) - len(nonprogress_exits)
+      promotable_entrances = [en for en in relevant_entrances if en in SECRET_CAVE_INNER_ENTRANCES]
+      if len(promotable_entrances) < num_promoted_entrances:
+        raise Exception("Not enough progression entrances for needed exits")
+      self.rng.shuffle(promotable_entrances)
+      nonprogress_entrances = [en for en in nonprogress_entrances if en not in promotable_entrances[:num_promoted_entrances]]
+
     assert len(nonprogress_entrances) == len(nonprogress_exits)
     
     return nonprogress_entrances, nonprogress_exits
