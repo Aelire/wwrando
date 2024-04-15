@@ -22,6 +22,14 @@ class TrickDifficulty(StrEnum):
 
 @dataclass
 class Options(BaseOptions):
+  #region Random settings
+  # Needs to be first for permalink calculation
+  randomize_settings: bool = option(
+    default=False,
+    description="Randomize which settings are enabled.<br>"
+    "When this option is enabled, most other randomization and progression options are disabled, and their value is instead selected randomly by the chosen seed.",
+  )
+  #endregion Random settings
   #region Progress locations
   progression_dungeons: bool = option(
     default=True,

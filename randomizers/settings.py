@@ -10,7 +10,7 @@ class SettingsRandomizer(BaseRandomizer):
 
     @override
     def is_enabled(self) -> bool:
-        return False
+        return self.options.randomize_settings
 
     @override
     def _randomize(self):
