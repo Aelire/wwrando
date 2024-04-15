@@ -250,11 +250,16 @@ class ItemRandomizer(BaseRandomizer):
       
       if len(possible_items) == 0:
         raise Exception("Only items left to place are predetermined items at inaccessible locations!")
+      only_traps_left = all(item == "Ice Trap Chest" for item in possible_items)
       
       # Filter out items that are not valid in any of the locations we might use.
       possible_items = self.logic.filter_items_by_any_valid_location(possible_items, accessible_undone_locations)
       
       if len(possible_items) == 0:
+        if only_traps_left:
+          # it's fine, just give up on trap chests
+          self.logic.unplaced_progress_items = list(filter(lambda x: x != "Ice Trap Chest", self.logic.unplaced_progress_items))
+          continue
         raise Exception("Not enough valid locations left for any of the unplaced progress items!")
       
       # Remove duplicates from the list so items like swords and bows aren't so likely to show up early.
@@ -628,7 +633,7 @@ class ItemRandomizer(BaseRandomizer):
         if loc not in previously_accessible_locations
       ]
       if not locations_in_this_sphere:
-        if logic.unplaced_progress_items:
+        if any(not item.endswith(" Trap Chest") for item in logic.unplaced_progress_items):
           raise Exception("Failed to calculate progression spheres")
         else:
           remaining_inaccessible_locations = [
