@@ -7,11 +7,11 @@ import traceback
 
 from version import VERSION
 
-LATEST_RELEASE_DOWNLOAD_PAGE_URL = "https://github.com/LagoLunatic/wwrando/releases/latest"
-LATEST_RELEASE_API_URL = "https://api.github.com/repos/lagolunatic/wwrando/releases/latest"
+LATEST_RELEASE_DOWNLOAD_PAGE_URL = "https://github.com/Aelire/wwrando/releases/latest"
+LATEST_RELEASE_API_URL = "https://api.github.com/repos/aelire/wwrando/releases/latest"
 
 def string_to_version(string: str):
-  string = string.removeprefix('v')
+  string = string.removeprefix('v').removeprefix('RS')
   if "-BETA" in string:
     string = string.split("-BETA")[0]
   if "_" in string:
