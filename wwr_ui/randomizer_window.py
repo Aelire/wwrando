@@ -13,6 +13,7 @@ from enum import StrEnum
 from collections import Counter
 
 from options.wwrando_options import Options, SwordMode
+from options.randomized.weight_sets import parse_weight_data as load_random_settings_weights
 from randomizer import WWRandomizer, TooFewProgressionLocationsError, InvalidCleanISOError, PermalinkWrongVersionError, PermalinkWrongCommitError
 from version import VERSION
 from wwrando_paths import SETTINGS_PATH, ASSETS_PATH, IS_RUNNING_FROM_SOURCE
@@ -63,6 +64,7 @@ class WWRandomizerWindow(QMainWindow):
     self.default_options.custom_colors = self.ui.tab_player_customization.get_all_colors()
     
     self.load_settings()
+    self.random_settings_weights = load_random_settings_weights()
     
     self.cached_item_locations = Logic.load_and_parse_item_locations()
     
@@ -687,7 +689,11 @@ class WWRandomizerWindow(QMainWindow):
       print("Gear list invalid, resetting")
       for opt in ["randomized_gear", "starting_gear"]:
         self.set_option_value(opt, self.default_options[opt])
-    
+
+    if self.get_option_value("randomize_settings"):
+      for option in Options.all:
+        should_enable_options[option.name] &= not self.random_settings_weights["default"].is_managed(option)
+
     for option in Options.all:
       if option.name == "custom_colors":
         continue
