@@ -514,7 +514,13 @@ class EntranceRandomizer(BaseRandomizer):
     self.randomize_one_set_of_exits(remaining_entrances, remaining_exits, terminal_exits, doing_banned=False)
   
   def check_if_one_exit_is_progress(self, exit: ZoneExit) -> bool:
-    locs_for_exit = self.zone_exit_to_logically_dependent_item_locations[exit]
+    # Any already-determined nested exits are also possibly progression 
+    locs_for_exit = []
+    for nested_ex in self.get_all_exits_nested_under(exit):
+      if nested_ex is None:
+        # This will only get determined later, so is not relevant yet
+        continue
+      locs_for_exit += self.zone_exit_to_logically_dependent_item_locations[nested_ex]
     assert locs_for_exit, f"Could not find any item locations corresponding to zone exit: {exit.unique_name}"
     # Banned required bosses mode dungeons still technically count as progress locations, so
     # filter them out separately first.
