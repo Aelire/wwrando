@@ -508,6 +508,8 @@ class WWRandomizer:
     for option in Options.all:
       if not option.permalink:
         continue
+      if options.randomize_settings and SettingsRandomizer.weights("default").is_managed(option):
+        continue
       
       value = options[option.name]
       
@@ -583,6 +585,8 @@ class WWRandomizer:
     bitsreader = PackedBitsReader(option_bytes)
     for option in Options.all:
       if not option.permalink:
+        continue
+      if options.randomize_settings and SettingsRandomizer.weights("default").is_managed(option):
         continue
       
       if issubclass(option.type, bool):
