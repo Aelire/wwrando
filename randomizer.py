@@ -20,7 +20,7 @@ from gclib.gcm import GCM
 from gclib.jpc import JPC100
 import tweaks
 from asm import patcher
-from logic.logic import Logic
+from logic.logic import Logic, TooFewProgressionLocationsError # reexported
 from wwlib.charts import ChartList
 from wwrando_paths import DATA_PATH, ASM_PATH, IS_RUNNING_FROM_SOURCE, SEEDGEN_PATH
 import customizer
@@ -74,7 +74,6 @@ RNG_CHANGING_OPTIONS = [
   "do_not_generate_spoiler_log",
 ]
 
-class TooFewProgressionLocationsError(Exception): pass
 class InvalidCleanISOError(Exception): pass
 class PermalinkWrongVersionError(Exception): pass
 class PermalinkWrongCommitError(Exception): pass
@@ -174,29 +173,9 @@ class WWRandomizer:
         stage_searcher.print_all_used_switches(self)
         sys.exit(0)
     
-    # Starting items. This list is read by the Logic when initializing your currently owned items list.
-    self.starting_items = [
-      "Wind Waker",
-      "Wind's Requiem",
-      "Boat's Sail",
-    ]
-    self.starting_items += self.options.starting_gear
-    
-    if self.options.sword_mode == SwordMode.START_WITH_SWORD:
-      self.starting_items.append("Progressive Sword")
-    # Add starting Triforce Shards.
-    num_starting_triforce_shards = self.options.num_starting_triforce_shards
-    for i in range(num_starting_triforce_shards):
-      self.starting_items.append("Triforce Shard %d" % (i+1))
-    
-    for i in range(self.options.starting_pohs):
-      self.starting_items.append("Piece of Heart")
-    
-    for i in range(self.options.starting_hcs):
-      self.starting_items.append("Heart Container")
-    
-    
+    self.starting_items = self.build_starting_items_from_options()
     self.custom_model_name = self.options.custom_player_model
+
     self.using_custom_sail_texture = False
     
     self.logic = Logic(self)
@@ -232,18 +211,8 @@ class WWRandomizer:
     ]
     
     self.logic.initialize_from_randomizer_state()
-    
-    num_progress_locations = self.logic.get_num_progression_locations()
-    max_required_bosses_banned_locations = self.logic.get_max_required_bosses_banned_locations()
+    self.logic.check_enough_progression_locations()
     self.all_randomized_progress_items = self.logic.unplaced_progress_items.copy()
-    if num_progress_locations - max_required_bosses_banned_locations < len(self.all_randomized_progress_items):
-      error_message = "Not enough progress locations to place all progress items.\n\n"
-      error_message += "Total progress items: %d\n" % len(self.all_randomized_progress_items)
-      error_message += "Progress locations with current options: %d\n" % num_progress_locations
-      if max_required_bosses_banned_locations > 0:
-        error_message += "Maximum Required Bosses Mode banned locations: %d\n" % max_required_bosses_banned_locations
-      error_message += "\nYou need to check more of the progress location options in order to give the randomizer enough space to place all the items."
-      raise TooFewProgressionLocationsError(error_message)
     
     # We need to determine if the user's selected options result in a dungeons-only-start.
     # Dungeons-only-start meaning that the only locations accessible at the start of the run are dungeon locations.
@@ -469,6 +438,32 @@ class WWRandomizer:
       tweaks.update_item_names_in_letter_advertising_rock_spire_shop(self)
     tweaks.prevent_fire_mountain_lava_softlock(self)
   
+
+  def build_starting_items_from_options(self) -> list[str]:
+    if self.fully_initialized:
+      raise Exception("Can't reset logic once rando has run")
+    # Starting items. This list is read by the Logic when initializing your currently owned items list.
+    starting_items = [
+      "Wind Waker",
+      "Wind's Requiem",
+      "Boat's Sail",
+    ]
+    starting_items += self.options.starting_gear
+    
+    if self.options.sword_mode == SwordMode.START_WITH_SWORD:
+      starting_items.append("Progressive Sword")
+    # Add starting Triforce Shards.
+    for i in range(self.options.num_starting_triforce_shards):
+      starting_items.append("Triforce Shard %d" % (i+1))
+    
+    for i in range(self.options.starting_pohs):
+      starting_items.append("Piece of Heart")
+    
+    for i in range(self.options.starting_hcs):
+      starting_items.append("Heart Container")
+    
+    return starting_items
+    
   @classmethod
   def sanitize_seed(cls, seed):
     seed = str(seed)

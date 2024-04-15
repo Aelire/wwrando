@@ -14,6 +14,8 @@ from wwrando_paths import LOGIC_PATH
 from randomizers import entrances
 from options.wwrando_options import Options, SwordMode
 
+class TooFewProgressionLocationsError(Exception): pass
+
 class Logic:
   DUNGEON_NAMES = {
     "DRC" : "Dragon Roost Cavern",
@@ -75,7 +77,17 @@ class Logic:
       self.triforce_chart_names.append("Triforce Chart %d" % i)
     for i in range(1, 41+1):
       self.treasure_chart_names.append("Treasure Chart %d" % i)
+
+    self.all_cleaned_item_names = []
+    self.unplaced_progress_items: list[str]
+    self.unplaced_nonprogress_items: list[str]
+    self.unplaced_fixed_consumable_items: list[str]
+    self.currently_owned_items: list[str] = []
     
+    if self.rando.fully_initialized:
+      self.initialize_from_randomizer_state()
+
+  def initialize_from_randomizer_state(self):
     if self.options.sword_mode == SwordMode.SWORDLESS:
       self.all_progress_items = [
         item_name for item_name in self.all_progress_items
@@ -116,15 +128,6 @@ class Logic:
       if cleaned_item_name not in self.all_cleaned_item_names:
         self.all_cleaned_item_names.append(cleaned_item_name)
     
-    self.unplaced_progress_items: list[str]
-    self.unplaced_nonprogress_items: list[str]
-    self.unplaced_fixed_consumable_items: list[str]
-    self.currently_owned_items: list[str] = []
-    
-    if self.rando.fully_initialized:
-      self.initialize_from_randomizer_state()
-  
-  def initialize_from_randomizer_state(self):
     self.nested_entrance_macros.clear()
     for zone_entrance in entrances.ZoneEntrance.all.values():
       if zone_entrance.is_nested:
@@ -1307,3 +1310,16 @@ class Logic:
         subset_item_combo, orig_req_expression,
         matched_combos, checked_combos,
       )
+
+  def check_enough_progression_locations(self):
+    num_progress_locations = self.get_num_progression_locations()
+    max_required_bosses_banned_locations = self.get_max_required_bosses_banned_locations()
+    all_randomized_progress_items = self.all_progress_items.copy()
+    if num_progress_locations - max_required_bosses_banned_locations < len(all_randomized_progress_items):
+      error_message = "Not enough progress locations to place all progress items.\n\n"
+      error_message += "Total progress items: %d\n" % len(all_randomized_progress_items)
+      error_message += "Progress locations with current options: %d\n" % num_progress_locations
+      if max_required_bosses_banned_locations > 0:
+        error_message += "Maximum Required Bosses Mode banned locations: %d\n" % max_required_bosses_banned_locations
+      error_message += "\nYou need to check more of the progress location options in order to give the randomizer enough space to place all the items."
+      raise TooFewProgressionLocationsError(error_message)
