@@ -1,7 +1,7 @@
 import os
 
 from ruamel.yaml import YAML
-yaml = YAML(typ="safe")
+yaml = YAML()
 
 from wwrando_paths import DATA_PATH
 
@@ -10,6 +10,9 @@ WEIGHTS_PATH = os.path.join(DATA_PATH, "random_settings_weights.yml")
 
 def load_data_files(file=WEIGHTS_PATH):
     with open(file) as f:
+        # Imports to be made available as references in the yaml files
+        import logic.item_types
+
         data = yaml.load(f)
 
     # Ensure all section names can be used as enum fields
