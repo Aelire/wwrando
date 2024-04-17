@@ -1,6 +1,10 @@
 ---
 default_progression:
   name: Default (Progression)
+  description: >
+    Randomize all progression settings, with classic weights from RSL season 1.<br>
+    Convenience tweaks, difficulty settings and number of hints are not randomized, 
+    letting you customize for an easier or harder experience
   weights:
     - name: dungeons_combo
       combo:
@@ -130,6 +134,10 @@ default_progression:
 
 default_difficulty:
   name: Default (Difficulty)
+  description: >
+    Choose your progression, randomize difficulty! All of the progression
+    settings are up to you, but the randomizer will choose how many hints you
+    get, starting items, hero mode, etc
   weights:
     - name: randomize_charts
       weight: 50%
@@ -217,6 +225,8 @@ default_difficulty:
 
 default_both:
   name: Default (Progression & Difficulty)
+  description: >
+    The classic RSL experience, updated with new difficulty settings and a bit more challenge
   inherit:
     - default_progression
     - default_difficulty
