@@ -4,7 +4,7 @@ from enum import StrEnum
 from options.base_options import BaseOptions, option
 
 from wwr_ui.inventory import DEFAULT_STARTING_ITEMS, DEFAULT_RANDOMIZED_ITEMS
-from .randomized.data import RANDOM_SETTINGS_PRESETS
+from .randomized.data import RANDOM_SETTINGS_PRESETS, WEIGHT_DATA as RANDOM_SETTINGS_DATA
 
 class SwordMode(StrEnum):
   START_WITH_SWORD = "Start with Hero's Sword"
@@ -38,6 +38,10 @@ class Options(BaseOptions):
   random_settings_preset: RandomSettingsPreset = option(
     default=next(iter(RANDOM_SETTINGS_PRESETS.values())),
     description="Choose style of random settings.<br> This determines which settings are randomized and what probability each option has to be enabled",
+    choice_descriptions={
+      RandomSettingsPreset(entry.get("name", ident)): entry.get("description", "")
+      for ident, entry in RANDOM_SETTINGS_DATA.items()
+    },
   )
   #endregion Random settings
   #region Progress locations
