@@ -3,8 +3,9 @@ from copy import copy
 from typing import Any
 
 from options.base_options import Option
+from options.wwrando_options import RandomSettingsPreset
 
-from .data import WEIGHT_DATA
+from .data import RANDOM_SETTINGS_PRESETS, WEIGHT_DATA
 from .weights import MalformedWeightsFile, OptionWeight
 
 
@@ -17,12 +18,14 @@ class WeightSet(list[OptionWeight]):
         return any(opt in o.managed_options for o in self)
 
 
-def parse_weight_data(raw_data: dict[str, Any] = WEIGHT_DATA) -> dict[str, WeightSet]:
-    weights: dict[str, dict[str, OptionWeight]] = {}
+def parse_weight_data(raw_data: dict[str, Any] = WEIGHT_DATA) -> dict[RandomSettingsPreset, WeightSet]:
+    weights: dict[RandomSettingsPreset, dict[str, OptionWeight]] = {}
     for section, sect_info in raw_data.items():
+        section = RandomSettingsPreset(sect_info.get("name", section))
         weights[section] = {}
         if "inherit" in sect_info:
             for included_section in sect_info["inherit"]:
+                included_section = RANDOM_SETTINGS_PRESETS.get(included_section, included_section)
                 if included_section == section:
                     raise MalformedWeightsFile(f"Circular reinclusion of section {section}", section=section)
                 for opt in weights[included_section].values():

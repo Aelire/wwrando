@@ -859,20 +859,32 @@ class Ui_MainWindow(object):
         self.groupBox_random_settings.setObjectName(u"groupBox_random_settings")
         self.gridLayout_random_settings = QGridLayout(self.groupBox_random_settings)
         self.gridLayout_random_settings.setObjectName(u"gridLayout_random_settings")
-        self.widget_rs_enable = QWidget(self.groupBox_random_settings)
-        self.widget_rs_enable.setObjectName(u"widget_rs_enable")
-
-        self.gridLayout_random_settings.addWidget(self.widget_rs_enable, 0, 3, 1, 1)
-
         self.randomize_settings = QCheckBox(self.groupBox_random_settings)
         self.randomize_settings.setObjectName(u"randomize_settings")
 
         self.gridLayout_random_settings.addWidget(self.randomize_settings, 0, 0, 1, 1)
 
+        self.hbox_random_settings_preset = QHBoxLayout()
+        self.hbox_random_settings_preset.setObjectName(u"hbox_random_settings_preset")
+        self.label_for_random_settings_preset = QLabel(self.groupBox_random_settings)
+        self.label_for_random_settings_preset.setObjectName(u"label_for_random_settings_preset")
+        sizePolicy.setHeightForWidth(self.label_for_random_settings_preset.sizePolicy().hasHeightForWidth())
+        self.label_for_random_settings_preset.setSizePolicy(sizePolicy)
+
+        self.hbox_random_settings_preset.addWidget(self.label_for_random_settings_preset)
+
+        self.random_settings_preset = QComboBox(self.groupBox_random_settings)
+        self.random_settings_preset.setObjectName(u"random_settings_preset")
+
+        self.hbox_random_settings_preset.addWidget(self.random_settings_preset)
+
+
+        self.gridLayout_random_settings.addLayout(self.hbox_random_settings_preset, 0, 2, 1, 1)
+
         self.widget_rs_placeholder1 = QWidget(self.groupBox_random_settings)
         self.widget_rs_placeholder1.setObjectName(u"widget_rs_placeholder1")
 
-        self.gridLayout_random_settings.addWidget(self.widget_rs_placeholder1, 0, 2, 1, 1)
+        self.gridLayout_random_settings.addWidget(self.widget_rs_placeholder1, 0, 3, 1, 1)
 
         self.widget_rs_placeholder2 = QWidget(self.groupBox_random_settings)
         self.widget_rs_placeholder2.setObjectName(u"widget_rs_placeholder2")
@@ -1040,6 +1052,7 @@ class Ui_MainWindow(object):
         QWidget.setTabOrder(self.prioritize_remote_hints, self.do_not_generate_spoiler_log)
         QWidget.setTabOrder(self.do_not_generate_spoiler_log, self.dry_run)
         QWidget.setTabOrder(self.dry_run, self.randomize_settings)
+        QWidget.setTabOrder(self.randomize_settings, self.random_settings_preset)
 
         self.retranslateUi(MainWindow)
 
@@ -1161,6 +1174,7 @@ class Ui_MainWindow(object):
         self.dry_run.setText(QCoreApplication.translate("MainWindow", u"Dry Run", None))
         self.groupBox_random_settings.setTitle(QCoreApplication.translate("MainWindow", u"Settings Randomizer", None))
         self.randomize_settings.setText(QCoreApplication.translate("MainWindow", u"Randomize Settings", None))
+        self.label_for_random_settings_preset.setText(QCoreApplication.translate("MainWindow", u"Preset", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_advanced), QCoreApplication.translate("MainWindow", u"Advanced Options", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_player_customization), QCoreApplication.translate("MainWindow", u"Player Customization", None))
         self.option_description.setText("")

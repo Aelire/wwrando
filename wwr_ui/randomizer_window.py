@@ -312,10 +312,9 @@ class WWRandomizerWindow(QMainWindow):
         assert issubclass(option.type, str)
         if widget.objectName() not in ["custom_player_model", "custom_color_preset"]:
           assert issubclass(option.type, StrEnum)
-          assert widget.count() == len(option.type)
-          for i, enum_value in enumerate(option.type):
-            # Make sure the text of each choice in the combobox matches the string enum value of the option.
-            widget.setItemText(i, enum_value.value)
+
+          widget.clear()
+          widget.addItems(list(iter(option.type)))
       elif isinstance(widget, QListView):
         assert issubclass(typing.get_origin(option.type) or option.type, list)
       elif isinstance(widget, QSpinBox):
@@ -694,9 +693,11 @@ class WWRandomizerWindow(QMainWindow):
       for opt in ["randomized_gear", "starting_gear"]:
         self.set_option_value(opt, self.default_options[opt])
 
+    should_enable_options["random_settings_preset"] = self.get_option_value("randomize_settings")
     if self.get_option_value("randomize_settings"):
+      weights = self.random_settings_weights[self.get_option_value("random_settings_preset")]
       for option in Options.all:
-        should_enable_options[option.name] &= not self.random_settings_weights["default"].is_managed(option)
+        should_enable_options[option.name] &= not weights.is_managed(option)
 
     for option in Options.all:
       if option.name == "custom_colors":

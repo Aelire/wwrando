@@ -515,7 +515,7 @@ class WWRandomizer:
     for option in Options.all:
       if not option.permalink:
         continue
-      if options.randomize_settings and SettingsRandomizer.weights("default").is_managed(option):
+      if options.randomize_settings and SettingsRandomizer.weights(options.random_settings_preset).is_managed(option):
         continue
       
       value = options[option.name]
@@ -593,7 +593,7 @@ class WWRandomizer:
     for option in Options.all:
       if not option.permalink:
         continue
-      if options.randomize_settings and SettingsRandomizer.weights("default").is_managed(option):
+      if options.randomize_settings and SettingsRandomizer.weights(options.random_settings_preset).is_managed(option):
         continue
       
       if issubclass(option.type, bool):
@@ -1049,7 +1049,7 @@ class WWRandomizer:
       and option.name != "randomized_gear" # Just takes up space
       and not (
         self.random_settings.is_enabled()
-        and self.random_settings.weights("default").is_managed(option)
+        and self.random_settings.weights(self.options.random_settings_preset).is_managed(option)
       )
     ]
     option_strings = []
