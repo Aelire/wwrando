@@ -4,6 +4,7 @@ from enum import StrEnum
 from options.base_options import BaseOptions, option
 
 from wwr_ui.inventory import DEFAULT_STARTING_ITEMS, DEFAULT_RANDOMIZED_ITEMS
+from .randomized.data import RANDOM_SETTINGS_PRESETS
 
 class SwordMode(StrEnum):
   START_WITH_SWORD = "Start with Hero's Sword"
@@ -20,6 +21,11 @@ class TrickDifficulty(StrEnum):
   HARD = "Hard"
   VERY_HARD = "Very Hard"
 
+RandomSettingsPreset = StrEnum(
+  "RandomSettingsPreset",
+  {k.upper(): v for k,v in RANDOM_SETTINGS_PRESETS.items()},
+)
+
 @dataclass
 class Options(BaseOptions):
   #region Random settings
@@ -28,6 +34,10 @@ class Options(BaseOptions):
     default=False,
     description="Randomize which settings are enabled.<br>"
     "When this option is enabled, most other randomization and progression options are disabled, and their value is instead selected randomly by the chosen seed.",
+  )
+  random_settings_preset: RandomSettingsPreset = option(
+    default=next(iter(RANDOM_SETTINGS_PRESETS.values())),
+    description="Choose style of random settings.<br> This determines which settings are randomized and what probability each option has to be enabled",
   )
   #endregion Random settings
   #region Progress locations
