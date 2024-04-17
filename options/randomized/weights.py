@@ -297,3 +297,81 @@ class DisabledOptionWeight(OptionWeight, characteristic_key="disable"):
     @override
     def roll(self, rng: random.Random) -> dict:
         return {}
+
+
+class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
+
+    max_combo: int | None
+    min_combo: int
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        indiv_weights: Sequence[Choice],
+        max_combo: int | None = None,
+        min_combo: int = 0,
+    ):
+
+        self.max_combo = max_combo
+        self.min_combo = min_combo
+        super().__init__(name=name, choices=self.combination_weights(*indiv_weights))
+
+    def combination_weights(self, *indiv_probs: Choice[Sequence]) -> list[Choice[list]]:
+        """Compute aggregate weights for a list of elements where each element can be
+        added or removed independently with its own probability
+        Optional max_combo limits any combination to have at most that number of elements from indiv_probs
+        """
+
+        if any(w > 1 for _, w in indiv_probs):
+            raise ValueError("Weights passed to combination_weights include a >1 weight")
+
+        ret: list[Choice[list]] = []
+        for combo in range(2 ** len(indiv_probs)):
+            # Reject unacceptable options
+            if self.max_combo and int.bit_count(combo) > self.max_combo:
+                continue
+            if int.bit_count(combo) < self.min_combo:
+                continue
+
+            items: list[str] = []
+            weight = Fraction(1)
+            for idx, item in enumerate(indiv_probs):
+                if combo & 2**idx:
+                    items.extend(item[0])
+                    weight *= item[1]
+                else:
+                    weight *= 1 - item[1]
+
+            if weight > 0:
+                ret.append(Choice[list](items, weight))
+
+        if self.max_combo is None and self.min_combo == 0:
+            assert sum(w for _, w in ret) == 1
+            # XXX: I should check my math, with min_ or max_combo the choices aren't independent anymore
+        return ret
+
+    @override
+    @classmethod
+    def from_yaml(cls, yaml_entry, /, section: str) -> OptionWeight:
+        name = yaml_entry.get("name")
+        if not name:
+            raise MalformedWeightsFile(f"Entry missing a name: {yaml_entry}", section=section)
+        if not name in Options.by_name:
+            raise MalformedWeightsFile("Unknown option", name=name, section=section)
+
+        indiv_weights = yaml_entry.get("indiv_weights")
+        if isinstance(indiv_weights, dict):
+            indiv_weights = indiv_weights.items()
+
+        try:
+            indiv_weights = [Choice([k] if isinstance(k, str) else k, _parse_percent(v)) for k, v in indiv_weights]
+        except ValueError as e:
+            raise MalformedWeightsFile(e, section=section, name=name) from None
+
+        return CombinationOptionWeight(
+            name=name,
+            indiv_weights=indiv_weights,
+            min_combo=yaml_entry.get("min_combo", 0),
+            max_combo=yaml_entry.get("max_combo"),
+        )
