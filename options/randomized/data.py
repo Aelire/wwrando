@@ -9,7 +9,10 @@ WEIGHTS_PATH = os.path.join(DATA_PATH, "random_settings_weights.yml")
 
 def load_data_files(file=WEIGHTS_PATH):
     with open(file) as f:
-        data = yaml.load(f, yaml.SafeLoader)
+        # Imports to be made available as references in the yaml files
+        import logic.item_types
+
+        data = yaml.load(f, yaml.FullLoader)
 
     # Ensure all section names can be used as enum fields
     assert all(ident.isidentifier() for ident in data.keys())
