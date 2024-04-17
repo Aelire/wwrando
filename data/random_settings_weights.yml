@@ -5,13 +5,11 @@ default_progression:
     - name: dungeons_combo
       combo:
         - progression_dungeons
-        - skip_rematch_bosses
         - required_bosses
       choices: !!omap
-        - ["progression_dungeons", "skip_rematch_bosses", "required_bosses"]: 72%
-        - ["progression_dungeons", "skip_rematch_bosses"]: 8%
-        - ["skip_rematch_bosses"]: 75/500
-        - []: 25/500
+        - ["progression_dungeons", "required_bosses"]: 72%
+        - ["progression_dungeons"]: 8%
+        - []: 20%
     - name: progression_great_fairies
       weight: 50%
     - name: progression_puzzle_secret_caves
@@ -75,30 +73,12 @@ default_progression:
       choices:
         "Separate Dungeons From Caves & Fountains": 3/4
         "Mix Dungeons & Caves & Fountains": 1/4
-    - name: randomize_charts
-      weight: 50%
     - name: randomize_starting_island
       weight: 100%
     - name: chest_type_matches_contents
       weight: 100%
 
-    - name: num_path_hints
-      choices:
-        6: 100%
-    - name: num_barren_hints
-      choices:
-        6: 100%
-    - name: num_location_hints
-      choices:
-        8: 100%
-    - name: num_item_hints
-      choices:
-        0: 100%
-    - name: cryptic_hints
-      weight: 0
     - name: prioritize_remote_hints
-      weight: 100%
-    - name: swift_sail
       weight: 100%
     - name: num_starting_triforce_shards
       choices:
@@ -111,13 +91,10 @@ default_progression:
         6: 2%
         7: 2%
         8: 1%
-    - name: add_shortcut_warps_between_dungeons
-      weight: 80%
     - name: sword_mode
       choices:
         "Start with Hero's Sword": 60%
-        "No Starting Sword": 35%
-        "Swordless": 5%
+        "No Starting Sword": 40%
     - name: num_required_bosses
       choices:
         1: 5%
@@ -126,14 +103,6 @@ default_progression:
         4: 30%
         5: 15%
         6: 10%
-    - name: starting_pohs
-      choices:
-        0: 100%
-    - name: starting_hcs
-      choices:
-        3: 100%
-    - name: randomize_enemies
-      weight: 0%
 
     - name: trap_chests
       weight: 50%
@@ -155,23 +124,154 @@ default_progression:
       disable:
       managed: true
     - name: starting_gear
+      indiv_weights: !!omap
+        - ["Telescope", "Ballad of Gales", "Song of Passing"]: 100%
+        - !!python/name:logic.item_types.DUNGEON_NONPROGRESS_ITEMS : 80%
+
+default_difficulty:
+  name: Default (Difficulty)
+  weights:
+    - name: randomize_charts
+      weight: 50%
+    - name: randomize_starting_island
+      weight: 1
+    - name: prioritize_remote_hints
+      weight: 60%
+    - name: num_path_hints
+      choices:
+        2: 1/6
+        3: 1/6
+        4: 1/6
+        5: 1/6
+        6: 1/6
+        8: 1/6
+    - name: num_barren_hints
+      choices:
+        2: 1/6
+        3: 1/6
+        4: 1/6
+        5: 1/6
+        6: 1/6
+        7: 1/6
+    - name: num_location_hints
+      choices:
+        4: 1/7
+        5: 1/7
+        6: 1/7
+        7: 1/7
+        8: 1/7
+        9: 1/7
+        10: 1/7
+    - name: num_item_hints
+      choices:
+        0: 50%
+        1: 25%
+        2: 15%
+        3: 10%
+    - name: cryptic_hints
+      weight: 40%
+    - name: add_shortcut_warps_between_dungeons
+      weight: 80%
+    - name: starting_pohs
+      choices:
+        0: 48%
+        1: 10%
+        2: 20%
+        3: 10%
+        4: 5%
+        5: 5%
+        6: 2%
+    - name: starting_hcs
+      choices:
+        1: 5%
+        2: 8%
+        3: 70%
+        4: 10%
+        6: 5%
+        9: 2%
+    - name: skip_rematch_bosses
+      weight: 75%
+    - name: trap_chests
+      weight: 50%
+    - name: hero_mode
+      weight: 10%
+    # When starting_gear is randomized, randomized_gear is also managed by the settings randomizer
+    # and cannot be set by the user anymore
+    - name: randomized_gear
+      disable:
+      managed: true
+    - name: starting_gear
+      min_combo: 2
+      max_combo: 6
+      indiv_weights: !!omap
+        - Telescope: 50%
+        - Ballad of Gales: 95%
+        - Song of Passing: 95%
+        - Empty Bottle: 10%
+        - ["Progressive Magic Meter", "Progressive Magic Meter"]: 2%
+        - Progressive Shield: 5%
+        - Magic Armor: 5%
+        - Hurricane Spin: 5%
+        - Hero's Charm: 10%
+        - !!python/name:logic.item_types.DUNGEON_NONPROGRESS_ITEMS : 80%
+
+default_both:
+  name: Default (Progression & Difficulty)
+  inherit:
+    - default_progression
+    - default_difficulty
+  weights:
+    - name: prioritize_remote_hints
+      weight: 1
+    - name: num_path_hints
+      choices:
+        6: 100%
+    - name: num_barren_hints
+      choices:
+        6: 100%
+    - name: num_location_hints
+      choices:
+        8: 100%
+    - name: num_item_hints
+      choices:
+        0: 100%
+    - name: sword_mode
+      choices:
+        Start with Hero's Sword: 55%
+        No Starting Sword: 35%
+        Swordless: 10%
+    - name: starting_hcs
+      choices:
+        1: 5%
+        2: 8%
+        3: 50%
+        4: 20%
+        6: 12%
+        9: 5%
+    - name: hero_mode
+      weight: 0
+    # Override how progression_dungeons is chosen in progression+difficulty randomizer
+    # to enforce the RSL rule that skip_rematch_bosses is always on if progression_dungeons is on
+    - name: skip_rematch_bosses
+      disable:
+    - name: dungeons_combo
+      combo:
+        - progression_dungeons
+        - required_bosses
+        - skip_rematch_bosses
       choices: !!omap
-        - ["Telescope", "Ballad of Gales", "Song of Passing"]: 20%
-        - ? [
-              "Telescope",
-              "Ballad of Gales",
-              "Song of Passing",
-              "DRC Dungeon Map",
-              "DRC Compass",
-              "FW Dungeon Map",
-              "FW Compass",
-              "TotG Dungeon Map",
-              "TotG Compass",
-              "FF Dungeon Map",
-              "FF Compass",
-              "ET Dungeon Map",
-              "ET Compass",
-              "WT Dungeon Map",
-              "WT Compass",
-            ]
-          : 80%
+        - ["progression_dungeons", "required_bosses", "skip_rematch_bosses"]:
+            72%
+        - ["progression_dungeons", "skip_rematch_bosses"]: 8%
+        - ["skip_rematch_bosses"]: 75/500
+        - []: 25/500
+    - name: randomized_gear
+      disable:
+      managed: true
+    - name: starting_gear
+      min_combo: 2
+      indiv_weights: !!omap
+        - Telescope: 95%
+        - Ballad of Gales: 98%
+        - Song of Passing: 95%
+        - !!python/name:logic.item_types.DUNGEON_NONPROGRESS_ITEMS : 80%
