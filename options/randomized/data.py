@@ -20,4 +20,8 @@ def load_data_files(file=WEIGHTS_PATH):
 
 
 WEIGHT_DATA = load_data_files()
-RANDOM_SETTINGS_PRESETS = {ident: entry.get("name", ident) for ident, entry in WEIGHT_DATA.items()}
+
+RANDOM_SETTINGS_PRESETS = {
+    ident: entry.get("name", ident)
+    for ident, entry in sorted(WEIGHT_DATA.items(), key=lambda t: t[1].get("display_order", len(WEIGHT_DATA) + 2))
+}

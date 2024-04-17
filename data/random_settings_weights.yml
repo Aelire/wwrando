@@ -220,6 +220,7 @@ default_both:
   inherit:
     - default_progression
     - default_difficulty
+  display_order: 1
   weights:
     - name: prioritize_remote_hints
       weight: 1
