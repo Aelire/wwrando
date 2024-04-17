@@ -1209,9 +1209,6 @@
                <string>Settings Randomizer</string>
               </property>
               <layout class="QGridLayout" name="gridLayout_random_settings">
-               <item row="0" column="3">
-                <widget class="QWidget" name="widget_rs_enable" native="true"/>
-               </item>
                <item row="0" column="0">
                 <widget class="QCheckBox" name="randomize_settings">
                  <property name="text">
@@ -1220,6 +1217,26 @@
                 </widget>
                </item>
                <item row="0" column="2">
+                <layout class="QHBoxLayout" name="hbox_random_settings_preset">
+                 <item>
+                  <widget class="QLabel" name="label_for_random_settings_preset">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="text">
+                    <string>Preset</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="random_settings_preset" native="true"/>
+                 </item>
+                </layout>
+               </item>
+               <item row="0" column="3">
                 <widget class="QWidget" name="widget_rs_placeholder1" native="true"/>
                </item>
                <item row="0" column="4">
@@ -1402,6 +1419,7 @@
   <tabstop>prioritize_remote_hints</tabstop>
   <tabstop>do_not_generate_spoiler_log</tabstop>
   <tabstop>randomize_settings</tabstop>
+  <tabstop>random_settings_preset</tabstop>
   <tabstop>permalink</tabstop>
   <tabstop>about_button</tabstop>
   <tabstop>reset_settings_to_default</tabstop>

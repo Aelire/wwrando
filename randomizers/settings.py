@@ -2,12 +2,12 @@ from typing import override
 
 from logic.logic import Logic, TooFewProgressionLocationsError
 from options.randomized.weight_sets import WeightSet, parse_weight_data
-from options.wwrando_options import Options
+from options.wwrando_options import Options, RandomSettingsPreset
 from randomizers.base_randomizer import BaseRandomizer
 
 
 class SettingsRandomizer(BaseRandomizer):
-    _weights: dict[str, WeightSet] | None = None
+    _weights: dict[RandomSettingsPreset, WeightSet] | None = None
 
     @override
     def is_enabled(self) -> bool:
@@ -26,7 +26,7 @@ class SettingsRandomizer(BaseRandomizer):
                 continue
 
     @classmethod
-    def weights(cls, section: str) -> WeightSet:
+    def weights(cls, section: RandomSettingsPreset) -> WeightSet:
         if not cls._weights:
             cls._weights = parse_weight_data()
         return cls._weights[section]
@@ -36,12 +36,12 @@ class SettingsRandomizer(BaseRandomizer):
         if options.randomize_settings:
             all_default_values = Options()
             for option in options.all:
-                if cls.weights("default").is_managed(option):
+                if cls.weights(options.random_settings_preset).is_managed(option):
                     options[option.name] = all_default_values[option.name]
 
     def select_settings(self) -> None:
         assert self.rng
-        for weight_info in self.weights("default"):
+        for weight_info in self.weights(self.options.random_settings_preset):
             for set_opt, set_val in weight_info.roll(self.rng).items():
                 self.options[set_opt] = set_val
 
@@ -67,12 +67,13 @@ class SettingsRandomizer(BaseRandomizer):
         return ""
 
     def write_to_non_spoiler_log(self) -> str:
-        return f'Randomized Settings: {", ".join(sorted(opt.name for opt in self.weights("default").managed_options))}'
+        return f"Randomized Settings: {', '.join(sorted(opt.name for opt in self.weights(self.options.random_settings_preset).managed_options))}"
 
     def write_to_spoiler_log(self) -> str:
-        out = "Randomized settings: "
+        out = f"Random Settings Preset: {self.options.random_settings_preset}\n"
+        out += "Randomized settings: "
         opts = []
-        for w in self.weights("default"):
+        for w in self.weights(self.options.random_settings_preset):
             for o in w.managed_options:
                 if o.name == "randomized_gear":
                     continue
