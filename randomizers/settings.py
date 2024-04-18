@@ -66,6 +66,9 @@ class SettingsRandomizer(BaseRandomizer):
     def progress_save_text(self) -> str:
         return ""
 
+    def write_to_non_spoiler_log(self) -> str:
+        return f'Randomized Settings: {", ".join(sorted(opt.name for opt in self.weights("default").managed_options))}'
+
     def check_for_valid_seed(self):
         logic_for_progression_items = Logic(self.rando)
         logic_for_progression_items.initialize_from_randomizer_state()
