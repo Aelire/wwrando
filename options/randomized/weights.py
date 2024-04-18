@@ -191,23 +191,29 @@ class OptionWeight:
         values, weights = zip(*self.choices)
         return {self.name: rng.choices(values, weights)[0]}
 
+    @property
+    def display_choices(self):
+        if not self.choices:
+            return self.choices
+
+        if isinstance(self.choices[0][0], bool):
+            for c, w in self.choices:
+                if c is True:
+                    return [(True, w)]
+
+        return self.choices
+
     def spoiler_log_line(self) -> str:
         return f"\t{self.name}: {self._spoiler_log_value()}\n"
 
     def _spoiler_log_value(self) -> str:
         if isinstance(self.choices[0][0], bool):
-            for c, w in self.choices:
-                if c is True:
-                    if w == 1:
-                        return "forced on"
-                    elif w == 0:
-                        return "forced off"
-                    else:
-                        return format_weight(w)
+            for c, w in self.display_choices:
+                return format_weight(w)
             assert False  # unreachable if self.choices is well-formed
         else:
             out = ""
-            for c, w in self.choices:
+            for c, w in self.display_choices:
                 if isinstance(c, (list, tuple)):
                     if c:
                         c = " & ".join(c)
@@ -215,6 +221,9 @@ class OptionWeight:
                         c = "(none of the options)"
                 out += f"\n\t\t{c}: {format_weight(w)}"
             return out
+
+    def help_text(self) -> str:
+        return ""
 
 
 class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
@@ -304,6 +313,9 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
         out = f"\t{self.name}: {', '.join(opt.name for opt in self.combo)}"
         out += super()._spoiler_log_value() + "\n"
         return out
+
+    def help_text(self) -> str:
+        return f"Determines multiple options at once"
 
 
 class DisabledOptionWeight(OptionWeight, characteristic_key="disable"):
@@ -438,14 +450,7 @@ class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
             # Show combinations individually since there aren't too many
             return super()._spoiler_log_value()
 
-        out = "Choosing a combination of elements "
-        if self.min_combo:
-            out += f"(minimum {self.min_combo}) "
-        elif self.max_combo:
-            out += f"(maximum {self.max_combo}) "
-        else:
-            out += f"(minimum {self.min_combo}, maximum {self.max_combo}) "
-        out += "where each has the following probability:"
+        out = self.help_text()
         for c, w in self.indiv_weights:
             if isinstance(c, (list, tuple)):
                 if len(c) > 1:
@@ -453,4 +458,19 @@ class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
                 else:
                     c = c[0]
             out += f"\n\t\t{c}: {format_weight(w)}"
+        return out
+
+    @property
+    def display_choices(self):
+        return self.indiv_weights
+
+    def help_text(self) -> str:
+        out = "Any combination of these elements "
+        if self.min_combo:
+            out += f"(minimum {self.min_combo}) "
+        elif self.max_combo:
+            out += f"(maximum {self.max_combo}) "
+        elif self.min_combo and self.max_combo:
+            out += f"(minimum {self.min_combo}, maximum {self.max_combo}) "
+        out += "where each is selected with the given probability:"
         return out
