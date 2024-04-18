@@ -1086,6 +1086,9 @@ class WWRandomizer:
     
     spoiler_log = self.get_log_header()
 
+    if self.random_settings.is_enabled():
+      spoiler_log += self.random_settings.write_to_spoiler_log()
+
     if self.extra_start_items.is_enabled():
       spoiler_log += self.extra_start_items.write_to_spoiler_log()
     
