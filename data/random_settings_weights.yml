@@ -444,3 +444,175 @@ spring24async:
       choices: { 3: 100% }
     - name: trap_chests
       weight: 50%
+
+experimental_fifty_fifty:
+  name: 50/50 (Experimental)
+  display_order: 100
+  description: >
+    It's a coin toss, and everything's fair game.<br>
+    All weights are uniform, all progression included, and most togglable difficulty settings
+  weights:
+    - name: dungeons_combo
+      # Forced by the randomizer, impossible to have required_bosses on without progression_dungeons
+      # So this approximates rolling them separately then ignoring required_bosses if dungeons is off
+      combo:
+        - progression_dungeons
+        - required_bosses
+      choices: !!omap
+        - ["progression_dungeons"]: 50%
+        - ["progression_dungeons", "required_bosses"]: 25%
+        - []: 25%
+    - name: progression_great_fairies
+      weight: 50%
+    - name: progression_puzzle_secret_caves
+      weight: 50%
+    - name: progression_combat_secret_caves
+      weight: 50%
+    - name: progression_short_sidequests
+      weight: 50%
+    - name: progression_long_sidequests
+      weight: 50%
+    - name: progression_spoils_trading
+      weight: 50%
+    - name: progression_minigames
+      weight: 50%
+    - name: progression_free_gifts
+      weight: 50%
+    - name: progression_mail
+      weight: 50%
+    - name: progression_platforms_rafts
+      weight: 50%
+    - name: progression_submarines
+      weight: 50%
+    - name: progression_eye_reef_chests
+      weight: 50%
+    - name: progression_big_octos_gunboats
+      weight: 50%
+    - name: progression_triforce_charts
+      weight: 50%
+    - name: progression_treasure_charts
+      weight: 50%
+    - name: progression_expensive_purchases
+      weight: 50%
+    - name: progression_misc
+      weight: 50%
+    - name: progression_tingle_chests
+      weight: 50%
+    - name: progression_battlesquid
+      weight: 50%
+    - name: progression_savage_labyrinth
+      weight: 50%
+    - name: progression_island_puzzles
+      weight: 50%
+    - name: progression_dungeon_secrets
+      weight: 50%
+    - name: keylunacy
+      weight: 50%
+    - name: randomize_dungeon_entrances
+      weight: 50%
+    - name: randomize_miniboss_entrances
+      weight: 50%
+    - name: randomize_boss_entrances
+      weight: 50%
+    - name: randomize_secret_cave_entrances
+      weight: 50%
+    - name: randomize_secret_cave_inner_entrances
+      weight: 50%
+    - name: randomize_fairy_fountain_entrances
+      weight: 50%
+    - name: mix_entrances
+      choices:
+        "Separate Dungeons From Caves & Fountains": 50%
+        "Mix Dungeons & Caves & Fountains": 50%
+    - name: randomize_starting_island
+      weight: 50%
+    - name: chest_type_matches_contents
+      # Fine, there is *1* rule
+      weight: 100%
+    - name: prioritize_remote_hints
+      weight: 50%
+    - name: num_starting_triforce_shards
+      choices:
+        0: 1/9
+        1: 1/9
+        2: 1/9
+        3: 1/9
+        4: 1/9
+        5: 1/9
+        6: 1/9
+        7: 1/9
+        8: 1/9
+    - name: sword_mode
+      choices:
+        "Start with Hero's Sword": 1/3
+        "No Starting Sword": 1/3
+        "Swordless": 1/3
+    - name: num_required_bosses
+      choices:
+        1: 1/6
+        2: 1/6
+        3: 1/6
+        4: 1/6
+        5: 1/6
+        6: 1/6
+    - name: trap_chests
+      weight: 50%
+    - name: hint_placement
+      combo: ["fishmen_hints", "hoho_hints", "korl_hints", "stone_tablet_hints"]
+      choices: !!omap
+        - ["hoho_hints"]: 1/4
+        - ["korl_hints"]: 1/4
+        - ["stone_tablet_hints"]: 1/4
+        - ["fishmen_hints"]: 1/4
+    - name: num_extra_starting_items
+      choices:
+        0: 25%
+        1: 25%
+        2: 25%
+        3: 25%
+    # When starting_gear is randomized, randomized_gear is also managed by the settings randomizer
+    # and cannot be set by the user anymore
+    - name: randomized_gear
+      disable:
+      managed: true
+    - name: starting_gear
+      indiv_weights: !!omap
+        - ["Telescope", "Ballad of Gales", "Song of Passing"]: 100%
+        - !!python/name:logic.item_types.DUNGEON_NONPROGRESS_ITEMS : 50%
+    - name: hero_mode
+      weight: 50%
+    - name: logic_obscurity
+      choices:
+        None: 1/4
+        Normal: 1/4
+        Hard: 1/4
+        Very Hard: 1/4
+    - name: logic_precision
+      choices:
+        None: 1/4
+        Normal: 1/4
+        Hard: 1/4
+        Very Hard: 1/4
+    - name: randomize_charts
+      weight: 50%
+    - name: cryptic_hints
+      weight: 50%
+    - name: add_shortcut_warps_between_dungeons
+      weight: 50%
+    - name: skip_rematch_bosses
+      weight: 50%
+    - name: starting_hcs
+      choices:
+        1: 1/9
+        2: 1/9
+        3: 1/9
+        4: 1/9
+        5: 1/9
+        6: 1/9
+        7: 1/9
+        8: 1/9
+        9: 1/9
+    - name: starting_pohs
+      choices: { 0: 100% }
+    - name: randomize_enemy_palettes
+      weight: 50%
