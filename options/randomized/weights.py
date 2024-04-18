@@ -49,6 +49,22 @@ def _parse_percent(value: Any) -> Fraction:
     return out
 
 
+def format_weight(weight: Fraction | int) -> str:
+    _, den = weight.as_integer_ratio()
+    if weight == 1:
+        return "Always"
+    elif weight == 0:
+        return "Never"
+    elif 100 % den == 0:
+        return f"{weight:.0%}"
+    elif 1000 % den == 0:
+        return f"{weight:.1%}"
+    elif 1000 % den == 0:
+        return f"{weight:.2%}"
+    else:
+        return str(weight)  # Default format (fraction)
+
+
 class Choice[T](NamedTuple):
     choice: T
     weight: Fraction | int
@@ -175,6 +191,31 @@ class OptionWeight:
         values, weights = zip(*self.choices)
         return {self.name: rng.choices(values, weights)[0]}
 
+    def spoiler_log_line(self) -> str:
+        return f"\t{self.name}: {self._spoiler_log_value()}\n"
+
+    def _spoiler_log_value(self) -> str:
+        if isinstance(self.choices[0][0], bool):
+            for c, w in self.choices:
+                if c is True:
+                    if w == 1:
+                        return "forced on"
+                    elif w == 0:
+                        return "forced off"
+                    else:
+                        return format_weight(w)
+            assert False  # unreachable if self.choices is well-formed
+        else:
+            out = ""
+            for c, w in self.choices:
+                if isinstance(c, (list, tuple)):
+                    if c:
+                        c = " & ".join(c)
+                    else:
+                        c = "(none of the options)"
+                out += f"\n\t\t{c}: {format_weight(w)}"
+            return out
+
 
 class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
     combo: tuple[Option, ...]
@@ -258,6 +299,12 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
 
         return {rolled_option.name: rolled_option.name in chosen for rolled_option in self.combo}
 
+    @override
+    def spoiler_log_line(self) -> str:
+        out = f"\t{self.name}: {', '.join(opt.name for opt in self.combo)}"
+        out += super()._spoiler_log_value() + "\n"
+        return out
+
 
 class DisabledOptionWeight(OptionWeight, characteristic_key="disable"):
     """Disables a previously defined roll.
@@ -298,9 +345,17 @@ class DisabledOptionWeight(OptionWeight, characteristic_key="disable"):
     def roll(self, rng: random.Random) -> dict:
         return {}
 
+    @override
+    def spoiler_log_line(self) -> str:
+        if self.managed:
+            return f"\t{self.name}: (determined by other options)\n"
+        else:
+            return ""
+
 
 class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
 
+    indiv_weights: list[Choice]
     max_combo: int | None
     min_combo: int
 
@@ -313,6 +368,7 @@ class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
         min_combo: int = 0,
     ):
 
+        self.indiv_weights = list(indiv_weights)
         self.max_combo = max_combo
         self.min_combo = min_combo
         super().__init__(name=name, choices=self.combination_weights(*indiv_weights))
@@ -375,3 +431,26 @@ class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
             min_combo=yaml_entry.get("min_combo", 0),
             max_combo=yaml_entry.get("max_combo"),
         )
+
+    @override
+    def _spoiler_log_value(self) -> str:
+        if len(self.choices) <= 5:
+            # Show combinations individually since there aren't too many
+            return super()._spoiler_log_value()
+
+        out = "Choosing a combination of elements "
+        if self.min_combo:
+            out += f"(minimum {self.min_combo}) "
+        elif self.max_combo:
+            out += f"(maximum {self.max_combo}) "
+        else:
+            out += f"(minimum {self.min_combo}, maximum {self.max_combo}) "
+        out += "where each has the following probability:"
+        for c, w in self.indiv_weights:
+            if isinstance(c, (list, tuple)):
+                if len(c) > 1:
+                    c = " & ".join(c)
+                else:
+                    c = c[0]
+            out += f"\n\t\t{c}: {format_weight(w)}"
+        return out
