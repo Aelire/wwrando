@@ -5,6 +5,7 @@ from wwr_ui.qt_init import load_ui_file
 
 from wwr_ui.update_checker import check_for_updates, LATEST_RELEASE_DOWNLOAD_PAGE_URL
 from wwr_ui.inventory import INVENTORY_ITEMS, DEFAULT_STARTING_ITEMS, DEFAULT_RANDOMIZED_ITEMS
+from wwr_ui.random_settings_weights_window import RSWeightsWindow
 
 import os
 import yaml
@@ -68,6 +69,7 @@ class WWRandomizerWindow(QMainWindow):
     
     self.load_settings()
     self.random_settings_weights = load_random_settings_weights()
+    self.ui.label_for_random_settings_preset.linkActivated.connect(self.open_random_settings_weights_popup)
     
     self.cached_item_locations = Logic.load_and_parse_item_locations()
     
@@ -741,6 +743,11 @@ class WWRandomizerWindow(QMainWindow):
     self.about_dialog.setWindowIcon(self.windowIcon())
     self.about_dialog.show()
   
+  def open_random_settings_weights_popup(self):
+    preset = self.get_option_value("random_settings_preset")
+    dialog = RSWeightsWindow(self, preset, self.random_settings_weights[preset])
+    dialog.show()
+
   def keyPressEvent(self, event):
     if event.key() == Qt.Key_Escape:
       self.close()
