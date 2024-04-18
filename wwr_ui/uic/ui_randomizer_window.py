@@ -869,6 +869,7 @@ class Ui_MainWindow(object):
         self.label_for_random_settings_preset.setObjectName(u"label_for_random_settings_preset")
         sizePolicy.setHeightForWidth(self.label_for_random_settings_preset.sizePolicy().hasHeightForWidth())
         self.label_for_random_settings_preset.setSizePolicy(sizePolicy)
+        self.label_for_random_settings_preset.setTextFormat(Qt.MarkdownText)
 
         self.hbox_random_settings_preset.addWidget(self.label_for_random_settings_preset)
 
@@ -1126,7 +1127,7 @@ class Ui_MainWindow(object):
         self.dry_run.setText(QCoreApplication.translate("MainWindow", u"Dry Run", None))
         self.groupBox_random_settings.setTitle(QCoreApplication.translate("MainWindow", u"Settings Randomizer", None))
         self.randomize_settings.setText(QCoreApplication.translate("MainWindow", u"Randomize Settings", None))
-        self.label_for_random_settings_preset.setText(QCoreApplication.translate("MainWindow", u"Preset", None))
+        self.label_for_random_settings_preset.setText(QCoreApplication.translate("MainWindow", u"Preset [[Weights]](random_settings_weights)", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_advanced), QCoreApplication.translate("MainWindow", u"Advanced Options", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_player_customization), QCoreApplication.translate("MainWindow", u"Player Customization", None))
         self.option_description.setText("")

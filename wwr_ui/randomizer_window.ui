@@ -1227,7 +1227,10 @@
                     </sizepolicy>
                    </property>
                    <property name="text">
-                    <string>Preset</string>
+                    <string>Preset [[Weights]](random_settings_weights)</string>
+                   </property>
+                   <property name="textFormat">
+                    <enum>Qt::MarkdownText</enum>
                    </property>
                   </widget>
                  </item>
