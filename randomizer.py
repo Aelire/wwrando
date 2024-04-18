@@ -1027,6 +1027,10 @@ class WWRandomizer:
       option.name for option in Options.all
       if self.options[option.name] not in [False, [], {}]
       and option.name != "randomized_gear" # Just takes up space
+      and not (
+        self.random_settings.is_enabled()
+        and self.random_settings.weights("default").is_managed(option)
+      )
     ]
     option_strings = []
     for option_name in non_disabled_options:
@@ -1057,7 +1061,10 @@ class WWRandomizer:
     
     log_str = self.get_log_header()
     
-    log_str += self.items.write_to_non_spoiler_log()
+    if self.random_settings.is_enabled():
+      log_str += self.random_settings.write_to_non_spoiler_log()
+    else:
+      log_str += self.items.write_to_non_spoiler_log()
     
     os.makedirs(self.logs_output_folder, exist_ok=True)
     nonspoiler_log_output_path = os.path.join(self.logs_output_folder, "WW Random %s - Non-Spoiler Log.txt" % self.seed)
