@@ -69,6 +69,18 @@ class SettingsRandomizer(BaseRandomizer):
     def write_to_non_spoiler_log(self) -> str:
         return f'Randomized Settings: {", ".join(sorted(opt.name for opt in self.weights("default").managed_options))}'
 
+    def write_to_spoiler_log(self) -> str:
+        out = "Randomized settings: "
+        opts = []
+        for w in self.weights("default"):
+            for o in w.managed_options:
+                if o.name == "randomized_gear":
+                    continue
+                opts.append(f"{o.name}: {getattr(self.options, o.name)}")
+        out += ", ".join(opts)
+        out += "\n\n"
+        return out
+
     def check_for_valid_seed(self):
         logic_for_progression_items = Logic(self.rando)
         logic_for_progression_items.initialize_from_randomizer_state()
