@@ -67,7 +67,12 @@ class SettingsRandomizer(BaseRandomizer):
         return ""
 
     def write_to_non_spoiler_log(self) -> str:
-        return f"Randomized Settings: {', '.join(sorted(opt.name for opt in self.weights(self.options.random_settings_preset).managed_options))}"
+        out = f"Random Settings Preset: {self.options.random_settings_preset}\n\n"
+        out += "Settings probabilities:\n"
+        for w in self.weights(self.options.random_settings_preset):
+            out += w.spoiler_log_line()
+        out += "\n"
+        return out
 
     def write_to_spoiler_log(self) -> str:
         out = f"Random Settings Preset: {self.options.random_settings_preset}\n"
