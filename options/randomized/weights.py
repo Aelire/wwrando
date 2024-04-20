@@ -2,6 +2,7 @@ import random
 from collections.abc import Collection, Iterable, Sequence
 from enum import Enum
 from fractions import Fraction
+from functools import reduce
 from typing import Any, ClassVar, NamedTuple, get_origin, override
 
 from options.base_options import Option
@@ -200,6 +201,25 @@ class OptionWeight:
             for c, w in self.choices:
                 if c is True:
                     return [(True, w)]
+        elif isinstance(self.choices[0][0], int):
+            # Try to collapse ranges of values that have the same probability. values must be sorted
+            def acc_range[T](known_ranges: list[Choice[T]], elem: Choice[T]) -> list[Choice[T]]:
+                if not known_ranges:
+                    return [elem]
+                prev = known_ranges[-1]
+                if elem.weight != prev.weight or not isinstance(prev.choice, (int, range)):
+                    return known_ranges + [elem]
+
+                if isinstance(elem.choice, int) and isinstance(prev.choice, int) and prev.choice == elem.choice - 1:
+                    known_ranges[-1] = Choice(range(prev.choice, elem.choice + 1), prev.weight)
+                    return known_ranges
+                elif isinstance(prev.choice, range) and prev.choice.step == 1 and prev.choice.stop == elem.choice:
+                    known_ranges[-1] = Choice(range(prev.choice.start, prev.choice.stop + 1), prev.weight)
+                    return known_ranges
+                else:
+                    return known_ranges + [elem]
+
+            return reduce(acc_range, self.choices, [])
 
         return self.choices
 
@@ -219,6 +239,8 @@ class OptionWeight:
                         c = " & ".join(c)
                     else:
                         c = "(none of the options)"
+                elif isinstance(c, range):
+                    c = f'{c.start}-{c.stop - 1}'
                 out += f"\n\t\t{c}: {format_weight(w)}"
             return out
 
