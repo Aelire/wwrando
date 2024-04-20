@@ -90,6 +90,10 @@ class RSWeightsWindow(QDialog):
             else:
                 choice = " & ".join(self.format_random_settings_choice(c) for c in choice)
 
+        if isinstance(choice, range) and choice.step == 1:
+            # Collapse consecutive ranges of numbers for fewer lines in the output
+            return f"{choice[0]} - {choice[-1]} (each)"
+
         return str(choice)
 
     def build_weight_table(self, preset: str, weights: WeightSet) -> None:
