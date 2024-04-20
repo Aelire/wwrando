@@ -444,3 +444,155 @@ spring24async:
       choices: { 3: 100% }
     - name: trap_chests
       weight: 50%
+
+guest_ofc2000alex:
+  name: "Featured Guest: ofc2000alex"
+  display_order: 2
+  description: >
+    Alex's submission for guest weights! Settings were rated on a 1-5 scale of
+    fun and get a 10% to 50% weight accordingly.
+  weights:
+    - name: dungeons_combo
+      combo:
+        - progression_dungeons
+        - required_bosses
+        - skip_rematch_bosses
+      choices: !!omap
+        - ["progression_dungeons", "required_bosses", skip_rematch_bosses]: 50%
+        - ["progression_dungeons"]: 5%
+        - []: 45%
+    - name: progression_great_fairies
+      weight: 20%
+    - name: progression_puzzle_secret_caves
+      weight: 50%
+    - name: progression_combat_secret_caves
+      weight: 40%
+    - name: progression_short_sidequests
+      weight: 30%
+    - name: progression_long_sidequests
+      weight: 10%
+    - name: progression_spoils_trading
+      weight: 20%
+    - name: progression_minigames
+      weight: 10%
+    - name: progression_free_gifts
+      weight: 30%
+    - name: progression_mail
+      weight: 50%
+    - name: progression_platforms_rafts
+      weight: 20%
+    - name: progression_submarines
+      weight: 40%
+    - name: progression_eye_reef_chests
+      weight: 10%
+    - name: progression_big_octos_gunboats
+      weight: 20%
+    - name: progression_triforce_charts
+      weight: 20%
+    - name: progression_treasure_charts
+      weight: 10%
+    - name: progression_expensive_purchases
+      weight: 50%
+    - name: progression_misc
+      weight: 40%
+    - name: progression_tingle_chests
+      weight: 30%
+    - name: progression_battlesquid
+      weight: 30%
+    - name: progression_savage_labyrinth
+      weight: 50%
+    - name: progression_island_puzzles
+      weight: 50%
+    - name: progression_dungeon_secrets
+      weight: 40%
+
+    - name: keylunacy
+      weight: 30%
+    - name: randomize_dungeon_entrances
+      weight: 40%
+    - name: randomize_secret_cave_entrances
+      weight: 30%
+    - name: randomize_secret_cave_inner_entrances
+      weight: 20%
+    - name: randomize_boss_entrances
+      weight: 40%
+    - name: randomize_miniboss_entrances
+      weight: 40%
+    - name: randomize_fairy_fountain_entrances
+      weight: 10%
+    - name: mix_entrances
+      choices:
+        "Separate Dungeons From Caves & Fountains": 50%
+        "Mix Dungeons & Caves & Fountains": 50%
+    - name: randomize_starting_island
+      weight: 100%
+    - name: chest_type_matches_contents
+      weight: 100%
+    - name: prioritize_remote_hints
+      weight: 100%
+    - name: num_starting_triforce_shards
+      choices:
+        0: 10%
+        1: 10%
+        2: 10%
+        3: 10%
+        4: 10%
+        5: 10%
+        6: 10%
+        7: 10%
+        8: 20%
+    - name: sword_mode
+      choices:
+        "Start with Hero's Sword": 20%
+        "No Starting Sword": 60%
+        "Swordless": 20%
+    - name: num_required_bosses
+      choices:
+        1: 10%
+        2: 20%
+        3: 20%
+        4: 20%
+        5: 20%
+        6: 10%
+    - name: trap_chests
+      weight: 100%
+    - name: hint_placement
+      combo: ["fishmen_hints", "hoho_hints", "korl_hints", "stone_tablet_hints"]
+      choices: !!omap
+        - ["hoho_hints"]: 50%
+        - ["korl_hints"]: 50%
+    - name: num_extra_starting_items
+      choices:
+        0: 45%
+        1: 40%
+        2: 10%
+        3: 5%
+    # When starting_gear is randomized, randomized_gear is also managed by the settings randomizer
+    # and cannot be set by the user anymore
+    - name: randomized_gear
+      disable:
+      managed: true
+    - name: starting_gear
+      indiv_weights: !!omap
+        - ["Telescope", "Ballad of Gales"]: 100%
+        - !!python/name:logic.item_types.DUNGEON_NONPROGRESS_ITEMS : 80%
+    - name: num_path_hints
+      choices:
+        2: 1/3
+        3: 1/3
+        4: 1/3
+    - name: num_barren_hints
+      choices:
+        2: 1/3
+        3: 1/3
+        4: 1/3
+    - name: num_location_hints
+      choices:
+        2: 1/3
+        3: 1/3
+        4: 1/3
+    - name: num_item_hints
+      choices:
+        0: 100%
+    - name: hero_mode
+      weight: 30%
