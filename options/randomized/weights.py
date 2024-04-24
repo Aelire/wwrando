@@ -1,5 +1,5 @@
 import random
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from enum import Enum
 from fractions import Fraction
 from functools import reduce
@@ -248,7 +248,7 @@ class OptionWeight:
         return ""
 
 
-class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
+class ChooseMultipleOptionWeight(OptionWeight, characteristic_key="combo"):
     combo: tuple[Option, ...]
 
     def __init__(
@@ -256,7 +256,7 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
         *,
         name: str,
         combo: Sequence[Option],
-        choices: Sequence[Choice],
+        choices: Sequence[Choice[dict[str, Any]]],
     ):
         super().__init__(name=name, choices=choices)
         self.combo = tuple(combo)
@@ -268,7 +268,7 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
 
     @override
     @classmethod
-    def from_yaml(cls, yaml_entry, /, section: str) -> "ChooseSubsetOptionWeight":
+    def from_yaml(cls, yaml_entry, /, section: str) -> "ChooseMultipleOptionWeight":
         combo = yaml_entry.get("combo")
         name = yaml_entry.get("name") or "&".join(combo)
 
@@ -278,20 +278,20 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
                     f"Unknown option: {next(opt for opt in combo if not opt in Options.by_name)}",
                     section=section,
                 )
-            if Options.by_name[opt].type != bool:
-                raise MalformedWeightsFile(
-                    "ChooseSubset must take bool-typed options",
-                    section=section,
-                    name=name,
-                )
         combo = tuple(Options.by_name[opt] for opt in combo)
 
-        choices = yaml_entry.get("choices")
-        # Choices can be either a mapping, or a list of tuples (items() format), in case keys are unhashable
-        # Use !!omap in yaml, or !!python/tuple to use tuples instead of lists for hashability
-        if isinstance(choices, dict):
-            choices = choices.items()
-        choices = [Choice(k, _parse_percent(v)) for k, v in choices]
+        raw_choices = yaml_entry.get("choices")
+        # normalize types
+        choices = []
+        for c, w in raw_choices:
+            w = _parse_percent(w)
+            if isinstance(c, Sequence):
+                choices.append(Choice({opt.name: opt.name in c for opt in combo}, w))
+            elif isinstance(c, Mapping):
+                choices.append(Choice(c, w))
+            else:
+                raise MalformedWeightsFile(f"ChooseMultiple choice wrong type: {c}", section=section, name=name)
+
         cls._check_all_choices_are_valid(combo, choices, section=section, name=name)
         if not sum(w for c, w in choices) == 1:
             raise MalformedWeightsFile(
@@ -301,34 +301,51 @@ class ChooseSubsetOptionWeight(OptionWeight, characteristic_key="combo"):
                 weight=sum(w for _c, w in choices),
             )
 
-        return ChooseSubsetOptionWeight(name=name, combo=combo, choices=choices)
+        return ChooseMultipleOptionWeight(name=name, combo=combo, choices=choices)
 
     @override
     @classmethod
     def _check_all_choices_are_valid(
         cls,
-        combo,
-        choices: Iterable[Choice],
+        combo: Sequence[Option],
+        choices: Iterable[Choice[Mapping[str, Any]]],
         /,
         section: str = "",
         name: str = "",
     ):
         for chosen_options in choices:
-            if not isinstance(chosen_options[0], Sequence):
-                raise MalformedWeightsFile("ChooseSubset choices must be sequence of toggles", section=section)
-            if any(Options.by_name[opt] not in combo for opt in chosen_options[0]):
-                bad_opt = next(opt for opt in chosen_options[0] if Options.by_name[opt] not in combo)
-                raise MalformedWeightsFile(
-                    f"ChooseSubset choice refers to an option not in combo",
-                    name=bad_opt,
-                    section=section,
-                )
+            known_opt_names = set(opt.name for opt in combo)
+            if known_opt_names != set(chosen_options.choice.keys()):
+                if missing_opts := known_opt_names - set(chosen_options.choice.keys()):
+                    raise MalformedWeightsFile(
+                        f"ChooseMultiple choice missing options: {missing_opts}",
+                        name=name,
+                        section=section,
+                    )
+                if unknown_options := set(chosen_options.choice.keys() - known_opt_names):
+                    raise MalformedWeightsFile(
+                        f"ChooseMultiple unknown options: {unknown_options}",
+                        name=name,
+                        section=section,
+                    )
+            for managed_opt, sel_value in chosen_options.choice.items():
+                opttype = get_origin(Options.by_name[managed_opt].type) or Options.by_name[managed_opt].type
+                if not isinstance(sel_value, opttype):
+                    try:
+                        Options.by_name[managed_opt].type(sel_value)
+                    except TypeError:
+                        raise MalformedWeightsFile(
+                            f"Wrong value type {managed_opt}: {sel_value} in combo choice.",
+                            section=section,
+                            name=name,
+                            weight=chosen_options.weight,
+                        )
 
     @override
     def roll(self, rng: random.Random) -> Any:
-        chosen = super().roll(rng)[self.name]
-
-        return {rolled_option.name: rolled_option.name in chosen for rolled_option in self.combo}
+        values, weights = zip(*self.choices)
+        # We already ensured that values are dicts and contains all of the determined options
+        return rng.choices(values, weights)[0]
 
     @override
     def spoiler_log_line(self) -> str:
