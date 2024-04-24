@@ -39,6 +39,12 @@ class RSWeightsWindow(QDialog):
         border: 1px solid black;
         border-bottom: 2px solid black;
     }
+    table tr td ul.multichoice {
+        -qt-list-indent: 0;
+        list-style: none;
+    }
+    table tr td ul.multichoice li {
+    }
 """
 
     def __init__(self, parent: QWidget | None, preset: str, weights: WeightSet) -> None:
@@ -89,6 +95,20 @@ class RSWeightsWindow(QDialog):
                 choice = "None of the options"
             else:
                 choice = " & ".join(self.format_random_settings_choice(c) for c in choice)
+        if isinstance(choice, dict):
+            entries = []
+            for opt, value in choice.items():
+                if isinstance(value, bool):
+                    if value:
+                        entries.append(f'<li>{self.format_random_settings_choice(opt)}</li>')
+                else:
+                    entries.append(f'<li>{self.format_random_settings_choice(opt)}: '
+                                    f'{self.format_random_settings_choice(value)}</li>')
+
+            if len(entries) == 0:
+                choice = "None of the options"
+            else:
+                choice = f'<ul class="multichoice">{"".join(entries)}</ul>'
 
         if isinstance(choice, range) and choice.step == 1:
             # Collapse consecutive ranges of numbers for fewer lines in the output
