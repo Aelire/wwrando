@@ -513,3 +513,136 @@ class CombinationOptionWeight(OptionWeight, characteristic_key="indiv_weights"):
             out += f"(minimum {self.min_combo}, maximum {self.max_combo}) "
         out += "where each is selected with the given probability:"
         return out
+
+
+class DecisionTreeOptionWeight(ChooseMultipleOptionWeight, characteristic_key="tree"):
+    """Determines multiple options in a decision-tree-like fashion
+    In practice this can often be reduced to a ChooseMultiple but calculating the weights is annoying
+    and less obvious when writing it out for documentation
+    """
+
+    root: OptionWeight
+    branches: list[tuple[Any, OptionWeight]]
+
+    def __init__(self, *, name: str, root: OptionWeight, branches: Sequence[tuple[Any, OptionWeight]]):
+        self.root = root
+        self.branches = list(branches)
+
+        super().__init__(
+            name=name,
+            combo=self.root.managed_options + self.branches[0][1].managed_options,
+            choices=self.derive_aggregate_weights(root, branches),
+        )
+
+    @staticmethod
+    def derive_aggregate_weights(root: OptionWeight, branches: Sequence[tuple[Any, OptionWeight]]) -> list[Choice]:
+        choices = []
+        for r in root.choices:
+            if r.weight == 0:
+                continue
+            root_choice_for_aggregation = (
+                {root.managed_options[0].name: r.choice} if not isinstance(r.choice, Mapping) else r.choice
+            )
+            taken_branch = next(b for b in branches if b[0] == r.choice)[1]
+            for b in taken_branch.choices:
+                if b.weight == 0:
+                    continue
+                branch_choice_for_aggregation = (
+                    {taken_branch.managed_options[0].name: b.choice} if not isinstance(b.choice, Mapping) else b.choice
+                )
+                choices.append(
+                    Choice({**root_choice_for_aggregation, **branch_choice_for_aggregation}, r.weight * b.weight)
+                )
+
+        if not sum(w for c, w in choices) == 1:
+            raise ValueError(
+                "Weights don't sum to 1. The branch choices are likely not exhaustive of the parent choices"
+            )
+        return choices
+
+    @override
+    @classmethod
+    def from_yaml(cls, yaml_entry, /, section: str) -> "DecisionTreeOptionWeight":
+        name = yaml_entry.get("name")
+        if not name:
+            raise MalformedWeightsFile(f"Entry missing a name: {yaml_entry}", section=section)
+
+        root_yaml = yaml_entry["tree"].get("root")
+        if root_yaml is None:
+            raise MalformedWeightsFile("Missing root node for DecisionTree", section=section, name=name)
+        if not root_yaml.get("name"):
+            root_yaml["name"] = f"{name}_root"
+        root = OptionWeight.from_yaml(root_yaml, section=section)
+
+        branches_yaml = yaml_entry["tree"].get("branches")
+        if branches_yaml is None:
+            raise MalformedWeightsFile("Missing branches node for DecisionTree", section=section, name=name)
+        if isinstance(branches_yaml, Mapping):
+            branches_yaml = list(branches_yaml.items())
+        if not isinstance(branches_yaml, Sequence):
+            raise MalformedWeightsFile(
+                "Decision tree branches must be omap keyed by root entry choices", section=section, name=name
+            )
+
+        if len(branches_yaml) != len(root.choices):
+            raise MalformedWeightsFile(
+                "Decision tree must have exactly as many branches as choices of the root node",
+                section=section,
+                name=name,
+            )
+
+        branches: list[tuple[Any, OptionWeight]] = []
+        for i, entry in enumerate(branches_yaml):
+            if len(entry) != 2:
+                raise MalformedWeightsFile("Branches must be omap", section=section, name=f"{name}/{i+1}")
+            root_choice_yaml, derived_choice_yaml = entry
+            root_choice = cls._normalize_choice(root.managed_options, root_choice_yaml)
+
+            if not root_choice in (k.choice for k in root.choices):
+                raise MalformedWeightsFile(
+                    f"branch doesn't refer to a root choice: {root_choice_yaml}", section=section, name=name
+                )
+
+            if not derived_choice_yaml.get("name"):
+                derived_choice_yaml["name"] = f"{name}/{i+1}"
+            derived_choice = OptionWeight.from_yaml(derived_choice_yaml, section=section)
+
+            # Note this will be a bit painful as it needs to ensure the root_choice_yaml matches
+            # any transformations made by the root node
+            branches.append((root_choice, derived_choice))
+
+        if any(e[1].managed_options != branches[0][1].managed_options for e in branches):
+            idx, bad_opts = next(
+                (i, e[1].managed_options)
+                for i, e in enumerate(branches)
+                if e[1].managed_options != branches[0][1].managed_options
+            )
+            raise MalformedWeightsFile(
+                "At least 2 branches don't determine the same options: \n"
+                f"Branch 1 determines {branches[0][1].managed_options}\n"
+                f"Branch {idx} determines {bad_opts}",
+                section=section,
+                name=name,
+            )
+
+        if overlapping_opts := set(branches[0][1].managed_options) & set(root.managed_options):
+            raise MalformedWeightsFile(
+                f"Overlapping options between root and branches of DecisionTree: {overlapping_opts}",
+                section=section,
+                name=name,
+            )
+
+        return DecisionTreeOptionWeight(name=name, root=root, branches=branches)
+
+    @staticmethod
+    def _normalize_choice(root_opts, elem):
+        # Heuristics to normalize choices to make them easier to write
+        # Recognize the ChooseMultiple shorthand for toggles
+        if (
+            isinstance(elem, Sequence)
+            and all(e in Options.by_name for e in elem)
+            and all(Options.by_name[e].type == bool for e in elem)
+        ):
+            return {opt.name: opt.name in elem for opt in root_opts}
+        # No idea how to handle indiv_weights mappings
+        return elem
