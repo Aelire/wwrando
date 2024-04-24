@@ -335,7 +335,8 @@ class WWRandomizer:
     yield("Randomizing...", progress_completed)
     for randomizer in self.randomizers:
       if randomizer.is_enabled():
-        yield(randomizer.progress_randomize_text, progress_completed)
+        if not self.random_settings.is_enabled():
+          yield(randomizer.progress_randomize_text, progress_completed)
         # start = time.perf_counter_ns()
         randomizer.randomize()
         # print(f"{(time.perf_counter_ns()-start)//1_000_000:6d}: {randomizer.__class__.__name__}.randomize")
@@ -345,7 +346,8 @@ class WWRandomizer:
     if not self.dry_run:
       for randomizer in self.randomizers:
         if randomizer.is_enabled():
-          yield(randomizer.progress_save_text, progress_completed)
+          if not self.random_settings.is_enabled():
+            yield(randomizer.progress_save_text, progress_completed)
           # start = time.perf_counter_ns()
           randomizer.save()
           # print(f"{(time.perf_counter_ns()-start)//1_000_000:6d}: {randomizer.__class__.__name__}.save")
