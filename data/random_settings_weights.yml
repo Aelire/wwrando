@@ -8,13 +8,17 @@ default_progression:
     letting you customize for an easier or harder experience
   weights:
     - name: dungeons_combo
-      combo:
-        - progression_dungeons
-        - required_bosses
-      choices: !!omap
-        - ["progression_dungeons", "required_bosses"]: 72%
-        - ["progression_dungeons"]: 8%
-        - []: 20%
+      tree:
+        root:
+          name: progression_dungeons
+          weight: 80%
+        branches:
+          true:
+            name: required_bosses
+            weight: 90%
+          false:
+            name: required_bosses
+            weight: 0
     - name: progression_great_fairies
       weight: 50%
     - name: progression_puzzle_secret_caves
@@ -193,15 +197,21 @@ default_both:
     - name: skip_rematch_bosses
       disable:
     - name: dungeons_combo
-      combo:
-        - progression_dungeons
-        - required_bosses
-        - skip_rematch_bosses
-      choices: !!omap
-        - ["progression_dungeons", "required_bosses", "skip_rematch_bosses"]: 72%
-        - ["progression_dungeons", "skip_rematch_bosses"]: 8%
-        - ["skip_rematch_bosses"]: 75/500
-        - []: 25/500
+      tree:
+        root:
+          name: progression_dungeons
+          weight: 80%
+        branches:
+          true:
+            combo: [required_bosses, skip_rematch_bosses]
+            choices: !!omap
+              - [required_bosses, skip_rematch_bosses]: 90%
+              - [skip_rematch_bosses]: 10%
+          false:
+            combo: [required_bosses, skip_rematch_bosses]
+            choices: !!omap
+              - [skip_rematch_bosses]: 75%
+              - []: 25%
     - name: randomized_gear
       disable:
       managed: true
