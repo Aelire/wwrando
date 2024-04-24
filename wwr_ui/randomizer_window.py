@@ -696,21 +696,33 @@ class WWRandomizerWindow(QMainWindow):
     if self.get_option_value("randomize_settings"):
       weights = self.random_settings_weights[self.get_option_value("random_settings_preset")]
       for option in Options.all:
-        should_enable_options[option.name] &= not weights.is_managed(option)
+        if weights.is_managed(option):
+          should_enable_options[option.name] = Qt.CheckState.PartiallyChecked
 
     for option in Options.all:
       if option.name == "custom_colors":
         continue
       widget = self.findChild(QWidget, option.name)
       label_for_option = self.findChild(QLabel, "label_for_" + option.name)
-      if should_enable_options[option.name]:
+      if should_enable_options[option.name] is True:
+        if isinstance(widget, QCheckBox):
+          widget.setTristate(False)
         widget.setEnabled(True)
         if label_for_option:
           label_for_option.setEnabled(True)
-      else:
+      elif should_enable_options[option.name] is False:
+        if isinstance(widget, QCheckBox):
+          widget.setTristate(False)
         widget.setEnabled(False)
         if isinstance(widget, QAbstractButton):
           widget.setChecked(False)
+        if label_for_option:
+          label_for_option.setEnabled(False)
+      else:
+        widget.setEnabled(False)
+        if isinstance(widget, QCheckBox):
+          widget.setTristate(True)
+          widget.setCheckState(should_enable_options[option.name])
         if label_for_option:
           label_for_option.setEnabled(False)
       
