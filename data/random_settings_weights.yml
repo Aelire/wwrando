@@ -782,3 +782,142 @@ guest_ofc2000alex:
         0: 100%
     - name: hero_mode
       weight: 30%
+
+experimental_pairwise:
+  name: Pairings (Experimental)
+  display_order: 100 # At the end
+  description: >
+    All progression options have companions! In each pair, exactly one is enabled, the other disabled
+  weights:
+    - name: chest_type_matches_contents
+      weight: 100%
+    - name: hopefully dungeons
+      tree:
+        root:
+          combo: [progression_dungeons, progression_treasure_charts]
+          choices: !!omap
+            - [progression_dungeons]: 90%
+            - [progression_treasure_charts]: 10%
+        branches: !!omap
+          - [progression_dungeons]:
+              name: bosses + shards + 2 = 8
+              combo: [required_bosses, num_required_bosses, num_starting_triforce_shards]
+              choices: !!omap
+                - { required_bosses: False, num_required_bosses: 0, num_starting_triforce_shards: 6 }: 1/7
+                - { required_bosses: True, num_required_bosses: 1, num_starting_triforce_shards: 5 }: 1/7
+                - { required_bosses: True, num_required_bosses: 2, num_starting_triforce_shards: 4 }: 1/7
+                - { required_bosses: True, num_required_bosses: 3, num_starting_triforce_shards: 3 }: 1/7
+                - { required_bosses: True, num_required_bosses: 4, num_starting_triforce_shards: 2 }: 1/7
+                - { required_bosses: True, num_required_bosses: 5, num_starting_triforce_shards: 1 }: 1/7
+                - { required_bosses: True, num_required_bosses: 6, num_starting_triforce_shards: 0 }: 1/7
+          - [progression_treasure_charts]:
+              combo: [required_bosses, num_required_bosses, num_starting_triforce_shards]
+              choices: !!omap
+                - { required_bosses: False, num_required_bosses: 0, num_starting_triforce_shards: 6 }: 1
+    - name: optional_inner_dungeon
+      combo: [progression_dungeon_secrets, progression_tingle_chests]
+      choices: !!omap
+        - [progression_dungeon_secrets]: 50%
+        - [progression_tingle_chests]: 50%
+    - name: caves
+      combo: [progression_puzzle_secret_caves, progression_combat_secret_caves]
+      choices: !!omap
+        - [progression_puzzle_secret_caves]: 50%
+        - [progression_combat_secret_caves]: 50%
+    - name: island_freestanding
+      combo: [progression_island_puzzles, progression_misc]
+      choices: !!omap
+        - [progression_island_puzzles]: 50%
+        - [progression_misc]: 50%
+    - name: sidequests
+      combo: [progression_short_sidequests, progression_long_sidequests]
+      choices: !!omap
+        - [progression_short_sidequests]: 3/4
+        - [progression_long_sidequests]: 1/4
+    - name: you'll need a wallet
+      combo: [progression_expensive_purchases, progression_triforce_charts]
+      choices: !!omap
+        - [progression_expensive_purchases]: 60%
+        - [progression_triforce_charts]: 40%
+    - name: the squids
+      combo: [progression_battlesquid, progression_big_octos_gunboats]
+      choices: !!omap
+        - [progression_battlesquid]: 50%
+        - [progression_big_octos_gunboats]: 50%
+    - name: savage or start without sword
+      combo: [progression_savage_labyrinth, sword_mode]
+      choices: !!omap
+        - { progression_savage_labyrinth: True, sword_mode: "Start with Hero's Sword" }: 60%
+        - { progression_savage_labyrinth: False, sword_mode: "No Starting Sword" }: 40%
+    - name: reef-rafts
+      combo: [progression_platforms_rafts, progression_eye_reef_chests]
+      choices: !!omap
+        - [progression_platforms_rafts]: 50%
+        - [progression_eye_reef_chests]: 50%
+    - name: the mail minigame
+      combo: [progression_mail, progression_minigames]
+      choices: !!omap
+        - [progression_mail]: 50%
+        - [progression_minigames]: 50%
+    - name: do you know the fairy colors?
+      combo: [progression_great_fairies, randomize_fairy_fountain_entrances]
+      choices: !!omap
+        - [progression_great_fairies]: 60%
+        - [randomize_fairy_fountain_entrances]: 40%
+    - name: don't look a gifted spoil in the mouth
+      combo: [progression_free_gifts, progression_spoils_trading]
+      choices: !!omap
+        - [progression_free_gifts]: 80%
+        - [progression_spoils_trading]: 20%
+    - name: trapped subs
+      combo: [progression_submarines, trap_chests]
+      choices: !!omap
+        - [progression_submarines]: 50%
+        - [trap_chests]: 50%
+    - combo: [randomize_boss_entrances, skip_rematch_bosses]
+      choices: !!omap
+        - [randomize_boss_entrances, skip_rematch_bosses]: 75%
+        - []: 25%
+    - combo: [mix_entrances, add_shortcut_warps_between_dungeons]
+      choices: !!omap
+        - { mix_entrances: Separate Dungeons From Caves & Fountains, add_shortcut_warps_between_dungeons: False }: 50%
+        - { mix_entrances: Mix Dungeons & Caves & Fountains, add_shortcut_warps_between_dungeons: True }: 50%
+    - combo: [keylunacy, randomize_dungeon_entrances]
+      choices: !!omap
+        - [keylunacy]: 50%
+        - [randomize_dungeon_entrances]: 50%
+    - name: whatever's left
+      tree:
+        root:
+          name: num_extra_starting_items
+          choices:
+            0: 40%
+            1: 30%
+            2: 20%
+            3: 10%
+        branches:
+          3:
+            combo:
+              [randomize_miniboss_entrances, randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]
+            choices: !!omap
+              - [randomize_miniboss_entrances, randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]:
+                  1
+          2:
+            combo:
+              [randomize_miniboss_entrances, randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]
+            choices: !!omap
+              - [randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]: 1/3
+              - [randomize_miniboss_entrances, randomize_secret_cave_inner_entrances]: 1/3
+              - [randomize_miniboss_entrances, randomize_secret_cave_entrances]: 1/3
+          1:
+            combo:
+              [randomize_miniboss_entrances, randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]
+            choices: !!omap
+              - [randomize_miniboss_entrances]: 1/3
+              - [randomize_secret_cave_entrances]: 1/3
+              - [randomize_secret_cave_inner_entrances]: 1/3
+          0:
+            combo:
+              [randomize_miniboss_entrances, randomize_secret_cave_entrances, randomize_secret_cave_inner_entrances]
+            choices: !!omap
+              - []: 1
