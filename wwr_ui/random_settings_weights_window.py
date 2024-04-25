@@ -7,7 +7,7 @@ from wwr_ui.uic.ui_random_settings_weights_window import Ui_RandomSettingsWeight
 
 from options.base_options import Option
 from options.wwrando_options import Options
-from options.randomized.weights import OptionWeight, format_weight
+from options.randomized.weights import Choice, OptionWeight, format_weight
 from options.randomized.weight_sets import WeightSet
 
 
@@ -44,6 +44,13 @@ class RSWeightsWindow(QDialog):
         list-style: none;
     }
     table tr td ul.multichoice li {
+    }
+    table tr td table {
+        margin: 0;
+        padding: 0;
+    }
+    table tr td table tr td {
+        border: 1px solid black;
     }
 """
 
@@ -116,6 +123,15 @@ class RSWeightsWindow(QDialog):
 
         return str(choice)
 
+    @staticmethod
+    def _classes_for_index(idx, iterlen):
+        css_class = []
+        if idx == 0:
+            css_class.append("first")
+        elif idx == iterlen - 1:
+            css_class.append("last")
+        return " ".join(css_class)
+
     def build_weight_table(self, preset: str, weights: WeightSet) -> None:
         self.setWindowTitle(f'Random Settings weights for preset "{preset}"')
         text = f"""
@@ -132,9 +148,10 @@ class RSWeightsWindow(QDialog):
             if len(line.display_choices) == 0:
                 continue
 
-            text += "<tr>"
-
-            is_toggle = isinstance(line.choices[0][0], bool)
+            text += "<tr>\n"
+            # choice is a namedtuple and inherits from tuple, so we can't just check that it's a tuple for nesting
+            is_nested = not isinstance(line.display_choices[0], Choice)
+            is_toggle = not is_nested and isinstance(line.display_choices[0].choice, bool)  # type: ignore
             option_cell = self.format_random_settings_choice(line)
             text += (
                 f'<td valign="middle" '
@@ -142,22 +159,43 @@ class RSWeightsWindow(QDialog):
                 f'class="first last">{option_cell}</td>'
             )
 
-            if is_toggle:
-                text += f'<td class="setting_weight first last">{format_weight(line.display_choices[0][1])}</td>\n'
+            if is_nested:
+                choices = cast(
+                    list[tuple[Choice, OptionWeight]],
+                    line.display_choices,
+                )
+                text += f'<td colspan="2" rowspan="{len(choices)}" class="first last"><table>'
+                classes = ""
+                for bidx, (branch, subline) in enumerate(choices):
+                    text += "<tr>"
+                    text += f'<td valign="middle" rowspan="{len(subline.display_choices)}" class="{classes}">{self.format_random_settings_choice(branch.choice)}</td>\n'
+                    text += f'<td valign="middle" rowspan="{len(subline.display_choices)}" class="setting_weight {classes}">{format_weight(branch.weight)}</td>\n'
+                    for idx, optchoice in enumerate(cast(list[Choice], subline.display_choices)):
+                        if idx > 0:
+                            text += "</tr>\n<tr>"
+                        text += f'<td class="{classes}">{self.format_random_settings_choice(optchoice.choice)}</td>\n'
+                        text += f'<td valign="middle" class="setting_weight {classes}">{format_weight(optchoice.weight)}</td>\n'
+                    text += "</tr>\n"
+                text += "</table></td>"
+                # Now flush the rest of the non-written rowspan lines
+                text += "</tr><tr>\n" * (len(choices) - 1)
+
+            elif is_toggle:
+                choice = cast(Choice, line.display_choices[0])
+                text += f'<td class="setting_weight first last">{format_weight(choice.weight)}</td>\n'
             else:
-                for idx, optchoice in enumerate(line.display_choices):
-                    css_class = []
-                    if idx == 0:
-                        css_class.append("first")
-                    elif idx == len(line.display_choices) - 1:
-                        css_class.append("last")
+                choices = cast(list[Choice], line.display_choices)
+                for idx, optchoice in enumerate(choices):
+                    # Qt doesn't support nth-child pseudo-selectors so we have to count these manually
+                    classes = self._classes_for_index(idx, len(choices))
                     if idx > 0:
                         text += "</tr>\n<tr>"
 
-                    text += f'<td class="{' '.join(css_class)}">{self.format_random_settings_choice(optchoice[0])}</td>\n'
-                    text += f'<td valign="middle" class="setting_weight {' '.join(css_class)}">{format_weight(optchoice[1])}</td>\n'
+                    text += f'<td class="{classes}">{self.format_random_settings_choice(optchoice.choice)}</td>\n'
+                    text += (
+                        f'<td valign="middle" class="setting_weight {classes}">{format_weight(optchoice.weight)}</td>\n'
+                    )
             text += "</tr>\n"
-
         text += "</tbody></table>"
         doc = QTextDocument()
         doc.setDefaultStyleSheet(self.STYLESHEET)
