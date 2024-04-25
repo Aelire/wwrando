@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from enum import Enum
 from fractions import Fraction
 from functools import reduce
-from typing import Any, ClassVar, NamedTuple, get_origin, override
+from typing import Any, ClassVar, NamedTuple, cast, get_origin, override
 
 from options.base_options import Option
 from options.wwrando_options import Options
@@ -193,14 +193,14 @@ class OptionWeight:
         return {self.name: rng.choices(values, weights)[0]}
 
     @property
-    def display_choices(self):
+    def display_choices(self) -> list[Choice] | list[tuple[Choice, "OptionWeight"]]:
         if not self.choices:
             return self.choices
 
         if isinstance(self.choices[0][0], bool):
             for c, w in self.choices:
                 if c is True:
-                    return [(True, w)]
+                    return [Choice(True, w)]
         elif isinstance(self.choices[0][0], int):
             # Try to collapse ranges of values that have the same probability. values must be sorted
             def acc_range[T](known_ranges: list[Choice[T]], elem: Choice[T]) -> list[Choice[T]]:
@@ -227,13 +227,16 @@ class OptionWeight:
         return f"\t{self.name}: {self._spoiler_log_value()}\n"
 
     def _spoiler_log_value(self) -> str:
-        if isinstance(self.choices[0][0], bool):
-            for c, w in self.display_choices:
+        choices = cast(
+            list[Choice], self.display_choices if isinstance(self.display_choices[0], Choice) else self.choices
+        )
+        if isinstance(choices[0].choice, bool):
+            for c, w in choices:
                 return format_weight(w)
             assert False  # unreachable if self.choices is well-formed
         else:
             out = ""
-            for c, w in self.display_choices:
+            for c, w in choices:
                 if isinstance(c, (list, tuple)):
                     if c:
                         c = " & ".join(c)
@@ -581,7 +584,9 @@ class DecisionTreeOptionWeight(ChooseMultipleOptionWeight, characteristic_key="t
             branches_yaml = list(branches_yaml.items())
         if not isinstance(branches_yaml, Sequence):
             raise MalformedWeightsFile(
-                "Decision tree branches must be omap keyed by root entry choices", section=section, name=name
+                "Decision tree branches must be omap keyed by root entry choices",
+                section=section,
+                name=name,
             )
 
         if len(branches_yaml) != len(root.choices):
@@ -600,7 +605,9 @@ class DecisionTreeOptionWeight(ChooseMultipleOptionWeight, characteristic_key="t
 
             if not root_choice in (k.choice for k in root.choices):
                 raise MalformedWeightsFile(
-                    f"branch doesn't refer to a root choice: {root_choice_yaml}", section=section, name=name
+                    f"branch doesn't refer to a root choice: {root_choice_yaml}",
+                    section=section,
+                    name=name,
                 )
 
             if not derived_choice_yaml.get("name"):
@@ -646,3 +653,25 @@ class DecisionTreeOptionWeight(ChooseMultipleOptionWeight, characteristic_key="t
             return {opt.name: opt.name in elem for opt in root_opts}
         # No idea how to handle indiv_weights mappings
         return elem
+
+    @property
+    @override
+    def display_choices(self) -> list[Choice] | list[tuple[Choice, OptionWeight]]:
+        if len(self.choices) < 6:
+            return super().display_choices
+
+        root_choices: list[Choice] = (
+            self.root.display_choices if isinstance(self.root.display_choices[0], Choice) else self.root.choices
+        )
+        return [
+            (
+                (r if isinstance(r.choice, dict) else Choice({self.root.managed_options[0].name: r.choice}, r.weight)),
+                next(b for b in self.branches if b[0] == r.choice)[1],
+            )
+            for r in root_choices
+        ]
+
+    def help_text(self) -> str:
+        if len(self.choices) < 6:
+            return super().help_text()
+        return "Chooses option values, then chooses more values with probabilities depending on the first roll"
