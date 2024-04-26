@@ -2,12 +2,12 @@ name: Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, rs/* ]
     paths-ignore:
       - 'docs/**'
       - '.github/workflows/publish-site.yml'
   pull_request:
-    branches: [ master ]
+    branches: [ rs/main ]
     paths-ignore:
       - 'docs/**'
       - '.github/workflows/publish-site.yml'
