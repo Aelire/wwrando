@@ -249,6 +249,22 @@ class EntranceRandomizer(BaseRandomizer):
     self.zone_exit_to_logically_dependent_item_locations: dict[ZoneExit, list[str]] = defaultdict(list)
     self.register_mappings_between_item_locations_and_zone_exits()
     
+    self.reset_entrance_connections()
+    for entrance_name, exit_name in self.entrance_connections.items():
+      zone_entrance = ZoneEntrance.all[entrance_name]
+      zone_exit = ZoneExit.all[exit_name]
+      self.done_entrances_to_exits[zone_entrance] = zone_exit
+      self.done_exits_to_entrances[zone_exit] = zone_entrance
+
+    self.nested_entrance_paths: list[list[str]] = []
+    self.nesting_enabled: bool = False
+    
+    self.safety_entrance = None
+    self.banned_exits: list[ZoneExit] = []
+    self.islands_with_a_banned_dungeon: set[str] = set()
+    self.islands_with_a_required_dungeon: set[str] = set()
+
+  def reset_entrance_connections(self):
     # Default entrances connections to be used if the entrance randomizer is not on.
     self.entrance_connections = {
       "Dungeon Entrance on Dragon Roost Island": "Dragon Roost Cavern",
@@ -305,20 +321,7 @@ class EntranceRandomizer(BaseRandomizer):
     
     self.done_entrances_to_exits: dict[ZoneEntrance, ZoneExit] = {}
     self.done_exits_to_entrances: dict[ZoneExit, ZoneEntrance] = {}
-    for entrance_name, exit_name in self.entrance_connections.items():
-      zone_entrance = ZoneEntrance.all[entrance_name]
-      zone_exit = ZoneExit.all[exit_name]
-      self.done_entrances_to_exits[zone_entrance] = zone_exit
-      self.done_exits_to_entrances[zone_exit] = zone_entrance
     
-    self.nested_entrance_paths: list[list[str]] = []
-    self.nesting_enabled: bool = False
-    
-    self.safety_entrance = None
-    self.banned_exits: list[ZoneExit] = []
-    self.islands_with_a_banned_dungeon: set[str] = set()
-    self.islands_with_a_required_dungeon: set[str] = set()
-  
   def init_from_randomizer_state(self):
     self.entrance_names_with_no_requirements = []
     self.exit_names_with_no_requirements = []
@@ -347,6 +350,7 @@ class EntranceRandomizer(BaseRandomizer):
       self.options.randomize_secret_cave_inner_entrances,
     ])
 
+    self.reset_entrance_connections()
     fixed_entrances, _fixed_exits = self.get_nonrandomized_entrances()
     for zone_entrance in fixed_entrances:
       zone_exit = ZoneExit.all[self.entrance_connections[zone_entrance.entrance_name]]
