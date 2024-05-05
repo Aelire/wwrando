@@ -125,7 +125,9 @@ class WWRandomizer:
       self.test_room_args = cmd_line_args.test
     
     seed_string = self.seed
-    if self.options.do_not_generate_spoiler_log:
+    if self.options.do_not_generate_spoiler_log or (
+      self.options.randomize_settings and SettingsRandomizer.weights(self.options.random_settings_preset).is_managed(Options.by_name["do_not_generate_spoiler_log"])
+    ):
       seed_string += SEED_KEY
     
     self.permalink = self.encode_permalink(self.seed, self.options, pretend_version=compat_version)
