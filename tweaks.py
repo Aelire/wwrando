@@ -2701,3 +2701,11 @@ def enable_hero_mode(self: WWRandomizer):
 def set_default_targeting_mode_to_switch(self: WWRandomizer):
   targeting_mode_addr = self.main_custom_symbols["option_targeting_mode"]
   self.dol.write_data(fs.write_u8, targeting_mode_addr, 1)
+
+def wither_dragon_roost_island_cavern_entrance_bomb_flowers(self: WWRandomizer):
+  dzx = self.get_arc("files/res/Stage/Adanmae/Room0.arc").get_file("room.dzr", DZx)
+  ripe_bomb_flowers = [act for act in dzx.entries_by_type(ACTR) if act.name == "BFlower"]
+  for i, flower in enumerate(ripe_bomb_flowers):
+    flower.type = 1 # Withered flower
+    flower.watered_switch = 0x42 + i # 0x42 is the first free switch in this stage
+    flower.save_changes()

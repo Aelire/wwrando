@@ -264,7 +264,15 @@ Can Reach Wind Temple Tall Basement Room:
   # Activating the giant fan is not necessary.
 
 Can Access Dungeon Entrance on Dragon Roost Island:
-  Nothing
+  # We update the 3 bomb flowers after the pond so that they start withered and
+  # need to be watered to complete the puzzle
+  # But the other options are using your own bombs, flying over the gap, or
+  # having Din's pearl and the lava being solid
+  Can Fly With Deku Leaf Outdoors
+  | Din's Pearl
+  | Empty Bottle
+  | Bombs
+  | Ice Arrows
 Can Access Forest Haven:
   Grappling Hook | Can Fly With Deku Leaf Outdoors
   # Grappling over the waterfall is very difficult without killing the Boko Baba there - but only if you start grappling from the top. You can grapple from the bottom up to avoid that Boko Baba entirely, so there's no extra requirement here for swordless.
