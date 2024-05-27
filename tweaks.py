@@ -520,9 +520,9 @@ def remove_title_and_ending_videos(self: WWRandomizer):
   self.replace_raw_file("files/thpdemo/title_loop.thp", new_data)
   self.replace_raw_file("files/thpdemo/end_st_epilogue.thp", new_data)
 
-def modify_title_screen_logo(self: WWRandomizer):
+def modify_title_screen_logo(self: WWRandomizer, image_name: str = "subtitle.png"):
   new_title_image_path = os.path.join(ASSETS_PATH, "title.png")
-  new_subtitle_image_path = os.path.join(ASSETS_PATH, "subtitle.png")
+  new_subtitle_image_path = os.path.join(ASSETS_PATH, image_name)
   tlogoe_arc = self.get_arc("files/res/Object/TlogoE.arc")
   
   title_image = tlogoe_arc.get_file("logo_zelda_main.bti", BTI)
