@@ -312,6 +312,10 @@ class WWRandomizer:
         tweaks.enable_hero_mode(self)
       if self.options.switch_targeting_mode:
         tweaks.set_default_targeting_mode_to_switch(self)
+      if self.options.randomize_settings:
+        tweaks.modify_title_screen_logo(self, "subtitle_rs.png")
+      else:
+        tweaks.modify_title_screen_logo(self)
       
       if self.map_select:
         patcher.apply_patch(self, "map_select")
@@ -389,7 +393,7 @@ class WWRandomizer:
     tweaks.add_chest_in_place_queen_fairy_cutscene(self)
     #tweaks.add_cube_to_earth_temple_first_room(self)
     tweaks.add_more_magic_jars(self)
-    tweaks.modify_title_screen_logo(self)
+    #tweaks.modify_title_screen_logo(self)
     tweaks.update_game_name_icon_and_banners(self)
     tweaks.allow_dungeon_items_to_appear_anywhere(self)
     #tweaks.remove_ballad_of_gales_warp_in_cutscene(self)
