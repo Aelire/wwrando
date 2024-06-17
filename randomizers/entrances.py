@@ -665,7 +665,9 @@ class EntranceRandomizer(BaseRandomizer):
         if zone_entrance.island_name in self.islands_with_a_banned_dungeon:
           possible_remaining_exits = [
             ex for ex in possible_remaining_exits
-            if not (ex in BOSS_EXITS or ex not in terminal_exits)
+            if ex in terminal_exits and
+            # None of the nested nonrandomized exits are bosses
+            not (set(BOSS_EXITS) & self.get_all_exits_nested_under(ex))
           ]
       
       if not possible_remaining_exits:
@@ -1130,4 +1132,18 @@ class EntranceRandomizer(BaseRandomizer):
     zone_exit = ZoneExit.all[boss_arena_name]
     outermost_entrance = self.get_outermost_entrance_for_exit(zone_exit)
     return outermost_entrance.island_name
+
+  def get_all_exits_nested_under(self, root_ex: ZoneExit) -> set[ZoneExit | None]:
+    # Return a set of all the exits accessible under this one. The set will
+    # contain None if any of the nested entrances are currently unassigned
+    if root_ex is None:
+      return {None}
+    new_entrances = {en for en in ZoneEntrance.all.values() if en.nested_in is not None and en.nested_in == root_ex}
+    accessible_exits = {self.done_entrances_to_exits.get(en, None) for en in new_entrances}
+    if accessible_exits:
+      nested_accessible_exits = (self.get_all_exits_nested_under(ex) for ex in accessible_exits if ex is not None)
+      accessible_exits.union(*nested_accessible_exits)
+    accessible_exits.add(root_ex)
+
+    return accessible_exits
   #endregion
