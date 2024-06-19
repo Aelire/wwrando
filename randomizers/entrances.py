@@ -3,6 +3,7 @@ import re
 from typing import ClassVar
 from collections import defaultdict
 
+from logic.item_types import DUNGEON_NONPROGRESS_ITEMS, DUNGEON_PROGRESS_ITEMS
 from wwlib.dzx import DZx, _2DMA, ACTR, PLYR, SCLS, STAG
 from wwlib.events import EventList
 from randomizers.base_randomizer import BaseRandomizer
@@ -183,19 +184,6 @@ FAIRY_FOUNTAIN_EXITS = [
   ZoneExit("Fairy01", 0, 0, 0, "Northern Fairy Fountain", zone_name="Northern Fairy Island"),
 ]
 
-DUNGEON_EXIT_NAMES_WITH_NO_REQUIREMENTS = [
-  "Dragon Roost Cavern",
-]
-PUZZLE_SECRET_CAVE_EXIT_NAMES_WITH_NO_REQUIREMENTS = [
-  "Pawprint Isle Chuchu Cave",
-  "Ice Ring Isle Secret Cave",
-  "Bird's Peak Rock Secret Cave", # Technically this has requirements, but it's just Wind Waker+Wind's Requiem.
-  "Diamond Steppe Island Warp Maze Cave",
-]
-COMBAT_SECRET_CAVE_EXIT_NAMES_WITH_NO_REQUIREMENTS = [
-  "Rock Spire Isle Secret Cave",
-]
-
 ENTRANCE_RANDOMIZABLE_ITEM_LOCATION_TYPES = [
   "Dungeon",
   "Puzzle Secret Cave",
@@ -296,14 +284,6 @@ class EntranceRandomizer(BaseRandomizer):
       self.done_entrances_to_exits[zone_entrance] = zone_exit
       self.done_exits_to_entrances[zone_exit] = zone_entrance
     
-    self.exit_names_with_no_requirements = []
-    
-    if self.options.progression_dungeons:
-      self.exit_names_with_no_requirements += DUNGEON_EXIT_NAMES_WITH_NO_REQUIREMENTS
-    if self.options.progression_puzzle_secret_caves:
-      self.exit_names_with_no_requirements += PUZZLE_SECRET_CAVE_EXIT_NAMES_WITH_NO_REQUIREMENTS
-    if self.options.progression_combat_secret_caves:
-      self.exit_names_with_no_requirements += COMBAT_SECRET_CAVE_EXIT_NAMES_WITH_NO_REQUIREMENTS
     # No need to check progression_savage_labyrinth, since neither of the items inside Savage have no requirements.
     
     self.nested_entrance_paths: list[list[str]] = []
@@ -314,6 +294,7 @@ class EntranceRandomizer(BaseRandomizer):
     ])
     
     self.safety_entrance = None
+    self.initially_accessible_exits: set[ZoneExit] = set()
     self.banned_exits: list[ZoneExit] = []
     self.islands_with_a_banned_dungeon: set[str] = set()
   
@@ -577,10 +558,7 @@ class EntranceRandomizer(BaseRandomizer):
       remaining_entrances.remove(zone_entrance)
       
       if zone_entrance == self.safety_entrance:
-        possible_remaining_exits = [
-          ex for ex in remaining_exits
-          if ex.unique_name in self.exit_names_with_no_requirements
-        ]
+        possible_remaining_exits = [ex for ex in remaining_exits if ex in self.initially_accessible_exits]
       else:
         possible_remaining_exits = remaining_exits
       
@@ -691,6 +669,43 @@ class EntranceRandomizer(BaseRandomizer):
       raise Exception("No accessible entrance at the start of the game")
     
     self.safety_entrance = self.rng.choice(accessible_entrances)
+    
+    # Then we get a list of exits that have progression locations accessible from the start, assuming you 
+    # can get to the location. This needs to be calculated now rather than at assignment time since
+    # we can't modify the entrance macros once we start randomizing the entrances
+    
+    # calculate the number of dungeon items to place in this dungeon (ie accounting for starting items)
+    num_required_dungeon_checks = {dungeon: 0 for dungeon in self.logic.DUNGEON_NAMES.values()}
+    for it in self.logic.unplaced_progress_items + self.logic.unplaced_nonprogress_items:
+      if it in DUNGEON_NONPROGRESS_ITEMS + DUNGEON_PROGRESS_ITEMS:
+        dungeon_name = self.logic.DUNGEON_NAMES[it.split(" ")[0]]
+        num_required_dungeon_checks[dungeon_name] += 1
+    
+    # Filter exits based on whether they have accessible progression locations, assuming we can get into the exit
+    self.logic.temporarily_make_entrance_macros_accessible()
+    for ex in ZoneExit.all.values():
+      exit_progress_locs = self.logic.filter_locations_for_progression(self.zone_exit_to_logically_dependent_item_locations[ex])
+      if not exit_progress_locs:
+        # No progression in here no matter what
+        continue
+      
+      if ex in DUNGEON_EXITS and not self.options.keylunacy:
+        # When keylunacy is on, dungeons essentially act as normal caves and fallback to the cave case below
+        if ex.unique_name == "Dragon Roost Cavern":
+          # DRC has special casing in the item randomizer to placate the key logic
+          self.initially_accessible_exits.add(ex)
+          continue
+        # Crudely, we check that we have enough accessible progression locations in the exit so that we can get 
+        # all the dungeon items and an additional progression item, even assuming worst case placement of dungeon items.
+        # This is fairly conservative since dungeon key logic could guarantee us more checks
+        accessible_progress_locs = [loc for loc in exit_progress_locs if self.logic.check_location_accessible(loc)]
+        if len(accessible_progress_locs) > num_required_dungeon_checks[ex.unique_name]:
+          self.initially_accessible_exits.add(ex)
+        
+      elif any(loc for loc in exit_progress_locs if self.logic.check_location_accessible(loc)):
+        self.initially_accessible_exits.add(ex)
+      
+    self.logic.update_entrance_connection_macros()
   
   def finalize_all_randomized_sets_of_entrances(self):
     non_terminal_exits = []

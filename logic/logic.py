@@ -690,6 +690,13 @@ class Logic:
       zone_access_macro_name = "Can Access " + zone_name
       self.set_macro(zone_access_macro_name, "Impossible")
   
+  def temporarily_make_entrance_macros_accessible(self):
+    # Update all the dungeon/secret cave access macros to be considered "Impossible".
+    # Useful when the entrance randomizer is selecting which dungeons/secret caves should be allowed where.
+    for entrance_name, zone_name in self.rando.entrances.entrance_connections.items():
+      zone_access_macro_name = "Can Access " + zone_name
+      self.set_macro(zone_access_macro_name, "Nothing")
+  
   def temporarily_make_entrance_macros_worst_case_scenario(self):
     # Update all the dungeon/secret cave access macros to be a combination of all the macros for
     # accessing dungeons/secret caves that can have their entrance randomized.
