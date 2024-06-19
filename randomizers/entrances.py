@@ -183,15 +183,6 @@ FAIRY_FOUNTAIN_EXITS = [
   ZoneExit("Fairy01", 0, 0, 0, "Northern Fairy Fountain", zone_name="Northern Fairy Island"),
 ]
 
-
-DUNGEON_ENTRANCE_NAMES_WITH_NO_REQUIREMENTS = [
-  "Dungeon Entrance on Dragon Roost Island",
-]
-SECRET_CAVE_ENTRANCE_NAMES_WITH_NO_REQUIREMENTS = [
-  "Secret Cave Entrance on Pawprint Isle",
-  "Secret Cave Entrance on Cliff Plateau Isles",
-]
-
 DUNGEON_EXIT_NAMES_WITH_NO_REQUIREMENTS = [
   "Dragon Roost Cavern",
 ]
@@ -305,14 +296,7 @@ class EntranceRandomizer(BaseRandomizer):
       self.done_entrances_to_exits[zone_entrance] = zone_exit
       self.done_exits_to_entrances[zone_exit] = zone_entrance
     
-    self.entrance_names_with_no_requirements = []
     self.exit_names_with_no_requirements = []
-    if self.options.progression_dungeons:
-      self.entrance_names_with_no_requirements += DUNGEON_ENTRANCE_NAMES_WITH_NO_REQUIREMENTS
-    if self.options.progression_puzzle_secret_caves \
-        or self.options.progression_combat_secret_caves \
-        or self.options.progression_savage_labyrinth:
-      self.entrance_names_with_no_requirements += SECRET_CAVE_ENTRANCE_NAMES_WITH_NO_REQUIREMENTS
     
     if self.options.progression_dungeons:
       self.exit_names_with_no_requirements += DUNGEON_EXIT_NAMES_WITH_NO_REQUIREMENTS
@@ -361,6 +345,7 @@ class EntranceRandomizer(BaseRandomizer):
   
   def _randomize(self):
     self.init_banned_exits()
+    self.select_safety_entrance()
     for relevant_entrances, relevant_exits in self.get_all_entrance_sets_to_be_randomized():
       self.randomize_one_set_of_entrances(relevant_entrances, relevant_exits)
     
@@ -438,33 +423,7 @@ class EntranceRandomizer(BaseRandomizer):
     for zone_exit in relevant_exits:
       del self.done_exits_to_entrances[zone_exit]
     
-    doing_dungeons = False
-    doing_caves = False
-    if any(ex in DUNGEON_EXITS for ex in relevant_exits):
-      doing_dungeons = True
-    if any(ex in SECRET_CAVE_EXITS for ex in relevant_exits):
-      doing_caves = True
-    
     self.rng.shuffle(relevant_entrances)
-    
-    doing_progress_entrances_for_dungeons_and_caves_only_start = False
-    if self.rando.dungeons_and_caves_only_start:
-      if doing_dungeons and self.options.progression_dungeons:
-        doing_progress_entrances_for_dungeons_and_caves_only_start = True
-      if doing_caves and (self.options.progression_puzzle_secret_caves \
-          or self.options.progression_combat_secret_caves \
-          or self.options.progression_savage_labyrinth):
-        doing_progress_entrances_for_dungeons_and_caves_only_start = True
-    
-    self.safety_entrance = None
-    if doing_progress_entrances_for_dungeons_and_caves_only_start:
-      # If the player can't access any locations at the start besides dungeon/cave entrances, we choose an entrance with no requirements that will be the first place the player goes.
-      # We will make this entrance lead to a dungeon/cave with no requirements so the player can actually get an item at the start.
-      possible_safety_entrances = [
-        e for e in relevant_entrances
-        if e.entrance_name in self.entrance_names_with_no_requirements
-      ]
-      self.safety_entrance = self.rng.choice(possible_safety_entrances)
     
     # We calculate which exits are terminal (the end of a nested chain) per-set instead of for all
     # entrances. This is so that, for example, Ice Ring Isle counts as terminal when its inner cave
@@ -549,7 +508,7 @@ class EntranceRandomizer(BaseRandomizer):
         nonprogress_entrances.append(ff_boss_entrance)
         possible_island_entrances.remove(ff_boss_entrance)
     
-    if self.safety_entrance is not None:
+    if self.safety_entrance is not None and self.safety_entrance in possible_island_entrances:
       # We do need to exclude the safety_entrance from being considered, as otherwise the item rando
       # would have nowhere to put items at the start of the seed.
       possible_island_entrances.remove(self.safety_entrance)
@@ -706,6 +665,32 @@ class EntranceRandomizer(BaseRandomizer):
           # We only keep track of dungeon exits and boss exits, not miniboss exits.
           # Banned miniboss exits can share an island with required dungeons/bosses.
           self.islands_with_a_banned_dungeon.add(zone_entrance.island_name)
+  
+  def select_safety_entrance(self):
+    self.logic.temporarily_make_entrance_macros_worst_case_scenario()
+    accessible_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
+    if accessible_locations:
+      # There are initially accessible locations, either in the overworld, in a nonrandomized entrance, 
+      # or in randomized entrances that we are guaranteed to have enough starting items to access
+      if self.options.keylunacy or any(not self.logic.is_dungeon_location(loc) for loc in accessible_locations):
+        # guaranteed accessible location where we can put the first progress item; no need for a safety entrance
+        return
+      
+      # Some dungeon locations are accessible but we would need additional checks to ensure keylogic is fine
+      # So assign a safety entrance anyway in this case
+      pass
+    self.logic.update_entrance_connection_macros()
+    
+    accessible_entrances = []
+    for entrance_set, _ in self.get_all_entrance_sets_to_be_randomized():
+      accessible_entrances += [
+        en for en in entrance_set
+        if not en.is_nested and self.logic.check_requirement_met(f"Can Access {en.entrance_name}")
+      ]
+    if not accessible_entrances:
+      raise Exception("No accessible entrance at the start of the game")
+    
+    self.safety_entrance = self.rng.choice(accessible_entrances)
   
   def finalize_all_randomized_sets_of_entrances(self):
     non_terminal_exits = []
