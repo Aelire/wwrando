@@ -68,6 +68,30 @@ def test_regression_entrance_inner_rando():
   rando = dry_rando_with_options(options)
   rando.randomize_all()
 
+def test_dungeon_only_seed():
+  options = Options()
+  disable_all_progression_location_options(options)
+  options.progression_dungeons = True
+
+  rando = dry_rando_with_options(options)
+  rando.randomize_all()
+
+def test_dungeon_only_seed_with_full_entrance_rando():
+  options = Options()
+  disable_all_progression_location_options(options)
+  options.progression_dungeons = True
+
+  options.randomize_dungeon_entrances = True
+  options.randomize_boss_entrances = True
+  options.randomize_miniboss_entrances = True
+  options.randomize_secret_cave_entrances = True
+  options.randomize_secret_cave_inner_entrances = True
+  options.randomize_fairy_fountain_entrances = True
+  options.mix_entrances = EntranceMixMode.MIX_DUNGEONS
+
+  rando = dry_rando_with_options(options)
+  rando.randomize_all()
+
 def test_trick_logic_checks():
   options = Options()
   options.logic_obscurity = TrickDifficulty.HARD
