@@ -297,7 +297,7 @@ class ItemRandomizer(BaseRandomizer):
             
             item_by_usefulness_fraction = self.logic.get_items_by_usefulness_fraction(
               possible_items,
-              filter_sunken_treasure=False,
+              filter_sunken_treasure=(self.options.progression_triforce_charts or self.options.progression_treasure_charts),
             )
             
             # We want to limit it to choosing items at the maximum usefulness fraction.
