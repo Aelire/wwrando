@@ -152,11 +152,6 @@ class HintsRandomizer(BaseRandomizer):
     # Validate location names in location hints file.
     for location_name in self.location_hints:
       assert location_name in rando.logic.item_locations, f"Invalid location name in hints file: {location_name!r}"
-    
-    # Define a dictionary mapping charts to their sunken treasure.
-    # This will be used to check whether or not the chart leads to a junk item. If so, the chart itself can be
-    # considered junk.
-    self.chart_name_to_sunken_treasure = {}
   
   def is_enabled(self) -> bool:
     return bool(self.rando.randomize_items)
@@ -928,9 +923,6 @@ class HintsRandomizer(BaseRandomizer):
   
   def generate_hints(self):
     previously_hinted_locations = []
-    
-    # Create a mapping for chart name -> sunken treasure
-    self.chart_name_to_sunken_treasure = self.rando.charts.build_chart_to_sunken_treasure_location_mapping()
     
     # Build of list of progress locations for this seed.
     progress_locations = self.logic.get_progress_locations()
