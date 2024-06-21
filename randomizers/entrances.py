@@ -633,7 +633,6 @@ class EntranceRandomizer(BaseRandomizer):
       remaining_exits.remove(zone_exit)
       
       self.entrance_connections[zone_entrance.entrance_name] = zone_exit.unique_name
-      # print(f"{zone_entrance.entrance_name} -> {zone_exit.unique_name}")
       self.done_entrances_to_exits[zone_entrance] = zone_exit
       self.done_exits_to_entrances[zone_exit] = zone_entrance
       
@@ -645,26 +644,37 @@ class EntranceRandomizer(BaseRandomizer):
           self.islands_with_a_banned_dungeon.add(zone_entrance.island_name)
   
   def select_safety_entrance(self):
+    unplaced_nondungeon_items = [it for it in self.logic.unplaced_progress_items if not self.logic.is_dungeon_item(it)]
     self.logic.temporarily_make_entrance_macros_worst_case_scenario()
+    min_initial_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
     accessible_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
-    if accessible_locations:
+    if len(accessible_locations) > min_initial_progress_items:
       # There are initially accessible locations, either in the overworld, in a nonrandomized entrance, 
       # or in randomized entrances that we are guaranteed to have enough starting items to access
-      if self.options.keylunacy or any(not self.logic.is_dungeon_location(loc) for loc in accessible_locations):
-        # guaranteed accessible location where we can put the first progress item; no need for a safety entrance
+      # If these entrances are in dungeons we need to consider keylogic, but otherwise if we have enough entrances we're good to go
+      if self.options.keylunacy:
+        return
+      if len([loc for loc in accessible_locations if not self.logic.is_dungeon_location(loc)]) >= min_initial_progress_items:
         return
       
-      # Some dungeon locations are accessible but we would need additional checks to ensure keylogic is fine
-      # So assign a safety entrance anyway in this case
-      pass
+      progression_dungeons = self.rando.boss_reqs.required_dungeons if self.options.required_bosses else set(self.logic.DUNGEON_NAMES.values())
+      accessible_dungeons = {loc.split(' - ')[0] for loc in accessible_locations if self.logic.is_dungeon_location(loc)}
+      for dungeon in accessible_dungeons & set(progression_dungeons):
+        accessible_dungeon_locs, given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(dungeon)
+        if len(accessible_dungeon_locs) > given_keys:
+          min_initial_progress_items -= len(accessible_dungeon_locs) - given_keys
+      if min_initial_progress_items < 0: # Enough guaranteed progress locations at the start
+        return
     self.logic.update_entrance_connection_macros()
     
     accessible_entrances = []
-    for entrance_set, _ in self.get_all_entrance_sets_to_be_randomized():
+    all_randomized_exits = []
+    for entrance_set, exit_set in self.get_all_entrance_sets_to_be_randomized():
       accessible_entrances += [
         en for en in entrance_set
         if not en.is_nested and self.logic.check_requirement_met(f"Can Access {en.entrance_name}")
       ]
+      all_randomized_exits += exit_set
     if not accessible_entrances:
       raise Exception("No accessible entrance at the start of the game")
     
@@ -673,37 +683,32 @@ class EntranceRandomizer(BaseRandomizer):
     # Then we get a list of exits that have progression locations accessible from the start, assuming you 
     # can get to the location. This needs to be calculated now rather than at assignment time since
     # we can't modify the entrance macros once we start randomizing the entrances
-    
-    # calculate the number of dungeon items to place in this dungeon (ie accounting for starting items)
-    num_required_dungeon_checks = {dungeon: 0 for dungeon in self.logic.DUNGEON_NAMES.values()}
-    for it in self.logic.unplaced_progress_items + self.logic.unplaced_nonprogress_items:
-      if it in DUNGEON_NONPROGRESS_ITEMS + DUNGEON_PROGRESS_ITEMS:
-        dungeon_name = self.logic.DUNGEON_NAMES[it.split(" ")[0]]
-        num_required_dungeon_checks[dungeon_name] += 1
-    
     # Filter exits based on whether they have accessible progression locations, assuming we can get into the exit
-    self.logic.temporarily_make_entrance_macros_accessible()
-    for ex in ZoneExit.all.values():
-      exit_progress_locs = self.logic.filter_locations_for_progression(self.zone_exit_to_logically_dependent_item_locations[ex])
-      if not exit_progress_locs:
-        # No progression in here no matter what
-        continue
-      
-      if ex in DUNGEON_EXITS and not self.options.keylunacy:
-        # When keylunacy is on, dungeons essentially act as normal caves and fallback to the cave case below
-        if ex.unique_name == "Dragon Roost Cavern":
-          # DRC has special casing in the item randomizer to placate the key logic
+    self.logic.temporarily_make_entrance_macros_worst_case_scenario()
+    for ex in all_randomized_exits:
+      with self.logic.temporarily_make_one_exit_accessible(ex.unique_name):
+        exit_progress_locs = self.logic.filter_locations_for_progression(self.zone_exit_to_logically_dependent_item_locations[ex])
+        if not exit_progress_locs:
+          # No progression in here no matter what
+          continue
+        
+        if ex in DUNGEON_EXITS and not self.options.keylunacy:
+          # When keylunacy is on, dungeons essentially act as normal caves and fallback to the cave case below
+          # Crudely, we check that we have enough accessible progression locations in the exit so that we can get 
+          # all the dungeon items and an additional progression item, even assuming worst case placement of dungeon items.
+          accessible_progress_locs, given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(ex.unique_name)
+          dungeon_key_name = self.logic.DUNGEON_NAME_TO_SHORT_DUNGEON_NAME[ex.unique_name] + " Small Key"
+          with self.logic.add_temporary_items([dungeon_key_name] * given_keys):
+            min_initial_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+            if len(accessible_progress_locs) >= given_keys + min_initial_progress_items:
+              # There will be non-key accessible locations, and the item randomizer will assign failsafe locations if necessary, this dungeon is usable
+              self.initially_accessible_exits.add(ex)
+              continue
+
+        min_initial_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+        if sum(1 for loc in exit_progress_locs if self.logic.check_location_accessible(loc)) > min_initial_progress_items:
           self.initially_accessible_exits.add(ex)
           continue
-        # Crudely, we check that we have enough accessible progression locations in the exit so that we can get 
-        # all the dungeon items and an additional progression item, even assuming worst case placement of dungeon items.
-        # This is fairly conservative since dungeon key logic could guarantee us more checks
-        accessible_progress_locs = [loc for loc in exit_progress_locs if self.logic.check_location_accessible(loc)]
-        if len(accessible_progress_locs) > num_required_dungeon_checks[ex.unique_name]:
-          self.initially_accessible_exits.add(ex)
-        
-      elif any(loc for loc in exit_progress_locs if self.logic.check_location_accessible(loc)):
-        self.initially_accessible_exits.add(ex)
       
     self.logic.update_entrance_connection_macros()
   

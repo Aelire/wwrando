@@ -1,7 +1,9 @@
 
+import contextlib
 import os
 import re
 
+from logic.item_types import DUNGEON_PROGRESS_ITEMS
 from logic.logic import Logic
 
 from gclib import fs_helpers as fs
@@ -14,8 +16,8 @@ class ItemRandomizer(BaseRandomizer):
   def __init__(self, rando):
     super().__init__(rando)
     
-    self.dungeons_only_start = False
-    self.drc_failsafe_location = None
+    self.dungeon_failsafe_locations = []
+    self.max_dungeon_failsafe_keys: dict[str, int] = {}
   
   def is_enabled(self) -> bool:
     return bool(self.rando.randomize_items)
@@ -91,30 +93,45 @@ class ItemRandomizer(BaseRandomizer):
       for loc in self.logic.get_accessible_remaining_locations(for_progression=True)
     )
     
-    # Temporarily add all items except for dungeon keys while we randomize them.
-    items_to_temporarily_add = [
+    unplaced_nondungeon_items = [
       item_name for item_name in (self.logic.unplaced_progress_items + self.logic.unplaced_nonprogress_items)
       if not self.logic.is_dungeon_item(item_name)
     ]
-    for item_name in items_to_temporarily_add:
+    
+    self.dungeon_failsafe_locations: list[str] = []
+    min_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+    if self.need_failsafe_dungeon_loc(min_progress_items):
+      progress_dungeons = self.rando.boss_reqs.required_dungeons.copy() if self.options.required_bosses else list(self.logic.DUNGEON_NAMES.values())
+      self.rng.shuffle(progress_dungeons)
+      progress_dungeons = iter(progress_dungeons)
+      visited_dungeons = set()
+      initially_accessible_locs, given_keys = None, 0
+      failsafe_dungeon = None
+      for _ in range(min_progress_items):
+        while not initially_accessible_locs:
+          failsafe_dungeon = next(progress_dungeons)
+          initially_accessible_locs, given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(failsafe_dungeon)
+          assert len(initially_accessible_locs) >= given_keys
+          initially_accessible_locs = [loc for loc in initially_accessible_locs if loc not in self.dungeon_failsafe_locations]
+        
+        assert failsafe_dungeon # type hint
+        if failsafe_dungeon in visited_dungeons:
+          # Key locs already taken into account
+          self.dungeon_failsafe_locations.append(self.rng.choice(initially_accessible_locs))
+        else:
+          # Need to reserve given_keys locations + a progress location
+          self.rng.shuffle(initially_accessible_locs)
+          self.dungeon_failsafe_locations += initially_accessible_locs[:given_keys + 1]
+          self.max_dungeon_failsafe_keys[failsafe_dungeon] = given_keys
+          visited_dungeons.add(failsafe_dungeon)
+
+    # Temporarily add all items except for dungeon keys while we randomize them.
+    for item_name in unplaced_nondungeon_items:
       self.logic.add_owned_item(item_name)
     
     # Temporarily remove all requirements for entering all dungeons while we randomize them.
     # This is for when dungeons are nested. Simply having all items except keys isn't enough if a dungeon is locked behind another dungeon.
     self.logic.temporarily_make_dungeon_entrance_macros_accessible()
-    
-    if self.dungeons_only_start:
-      # Choose a random location out of the 6 easiest locations to access in DRC.
-      # This location will not have the big key, dungeon map, or compass on this seed. (But can still have small keys/non-dungeon items.)
-      # This is to prevent a rare error in dungeons-only-start.
-      self.drc_failsafe_location = self.rng.choice([
-        "Dragon Roost Cavern - First Room",
-        "Dragon Roost Cavern - Alcove With Water Jugs",
-        "Dragon Roost Cavern - Boarded Up Chest",
-        "Dragon Roost Cavern - Rat Room",
-        "Dragon Roost Cavern - Rat Room Boarded Up Chest",
-        "Dragon Roost Cavern - Bird's Nest",
-      ])
     
     # Randomize small keys.
     small_keys_to_place = [
@@ -146,7 +163,7 @@ class ItemRandomizer(BaseRandomizer):
       self.place_dungeon_item(item_name)
     
     # Remove the items we temporarily added.
-    for item_name in items_to_temporarily_add:
+    for item_name in unplaced_nondungeon_items:
       self.logic.remove_owned_item(item_name)
     for item_name in small_keys_to_place:
       self.logic.remove_owned_item(item_name)
@@ -155,7 +172,32 @@ class ItemRandomizer(BaseRandomizer):
     
     # Reset the dungeon entrance macros.
     self.logic.update_entrance_connection_macros()
-
+  
+  def need_failsafe_dungeon_loc(self, min_progress_items: int = 1) -> bool:
+    # At this stage, entrances and extra starting items have been completely assigned,
+    # so we can check whether the actual start conditions result in a dungeon-only start
+    initially_accessible_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
+    progress_dungeons = self.rando.boss_reqs.required_dungeons if self.options.required_bosses else list(self.logic.DUNGEON_NAMES.values())
+    if not all(self.logic.is_dungeon_location(loc) for loc in initially_accessible_locations):
+      return False
+    
+    # All progression locations are in dungeons, so this is a dungeon-only start (and dungeons are progression)
+    # Check if we need to tweak some dungeon item logic to guarantee a progression location in one of the dungeons
+    required_dungeon_locs = self.logic.get_max_dungeon_item_locations()
+    for dungeon in progress_dungeons:
+      accessible_locs_in_dungeon = [
+        loc for loc in initially_accessible_locations
+        if self.logic.is_dungeon_location(loc, dungeon_name_to_match=dungeon)
+      ]
+      if len(accessible_locs_in_dungeon) >= required_dungeon_locs[dungeon] + min_progress_items:
+        # Easy case, no matter where the keys end up we have a location
+        return False
+      accessible_locs_in_dungeon, _given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(dungeon)
+      if len(accessible_locs_in_dungeon) >= required_dungeon_locs[dungeon] + min_progress_items:
+        return False
+    
+    return True
+  
   def place_dungeon_item(self, item_name):
     if self.options.progression_dungeons:
       # If dungeons themselves are progress, do not allow dungeon items to appear in any dungeon
@@ -174,21 +216,26 @@ class ItemRandomizer(BaseRandomizer):
     
     possible_locations = self.logic.filter_locations_valid_for_item(accessible_undone_locations, item_name)
     
-    if self.dungeons_only_start and item_name == "DRC Small Key":
-      # If we're in a dungeons-only-start, we have to ban small keys from appearing in the path that sequence breaks the hanging platform.
-      # A key you need to progress appearing there can cause issues that dead-end the item placement logic when there are no locations outside DRC for the randomizer to give you other items at.
-      possible_locations = [
-        loc for loc in possible_locations
-        if loc not in ["Dragon Roost Cavern - Big Key Chest", "Dragon Roost Cavern - Tingle Statue Chest"]
-      ]
-    if self.dungeons_only_start and item_name in ["DRC Big Key", "DRC Dungeon Map", "DRC Compass"]:
-      # If we're in a dungeons-only start, we have to ban dungeon items except small keys from appearing in all 6 of the 6 easiest locations to access in DRC.
-      # If we don't do this, there is a small chance that those 6 locations will be filled with 3 small keys, the dungeon map, and the compass. The 4th small key will be in the path that sequence breaks the hanging platform, but there will be no open spots to put any non-dungeon items like grappling hook.
-      # To prevent this specific problem, one location (chosen randomly) is not allowed to have these items at all in dungeons-only-start. It can still have small keys and non-dungeon items.
-      possible_locations = [
-        loc for loc in possible_locations
-        if loc != self.drc_failsafe_location
-      ]
+    if self.dungeon_failsafe_locations:
+      item_can_be_in_failsafe = True
+      if any(item_name.endswith(item_type) for item_type in (" Big Key", " Dungeon Map", " Compass")):
+        # If we're in a dungeons-only start, we have to ban dungeon items except small keys from appearing in all the locations that are accessible from the initial game state
+        # If we don't do this, there is a small chance that those locations will be filled with all the dungeon items, leaving no progression location
+        # To prevent this specific problem, one location (chosen randomly) is not allowed to have these items at all in dungeons-only-start. It can still have small keys and non-dungeon items.
+        item_can_be_in_failsafe = False
+      elif item_name.endswith(" Small Key"):
+        dungeon = self.logic.DUNGEON_NAMES[item_name.split(" ")[0]]
+        if self.max_dungeon_failsafe_keys.get(dungeon, 0) == 0:
+          item_can_be_in_failsafe = False
+        else:
+          self.max_dungeon_failsafe_keys[dungeon] -= 1
+          item_can_be_in_failsafe = True
+
+      if not item_can_be_in_failsafe:
+        possible_locations = [
+          loc for loc in possible_locations
+          if loc not in self.dungeon_failsafe_locations
+        ]
     
     if not possible_locations:
       raise Exception("No valid locations left to place dungeon items!")
@@ -287,6 +334,10 @@ class ItemRandomizer(BaseRandomizer):
         self.rng.shuffle(shuffled_list)
         item_name = self.logic.get_first_useful_item(shuffled_list)
         if item_name is None:
+          item_by_usefulness_fraction = self.logic.get_items_by_usefulness_fraction(
+            possible_items,
+            filter_sunken_treasure=not (self.options.progression_triforce_charts or self.options.progression_treasure_charts),
+          )
           if must_place_useful_item:
             raise Exception("No useful progress items to place!")
           else:
@@ -297,7 +348,7 @@ class ItemRandomizer(BaseRandomizer):
             
             item_by_usefulness_fraction = self.logic.get_items_by_usefulness_fraction(
               possible_items,
-              filter_sunken_treasure=(self.options.progression_triforce_charts or self.options.progression_treasure_charts),
+              filter_sunken_treasure=not (self.options.progression_triforce_charts or self.options.progression_treasure_charts),
             )
             
             # We want to limit it to choosing items at the maximum usefulness fraction.

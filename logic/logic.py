@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+import contextlib
+from typing import TYPE_CHECKING, Iterable
 if TYPE_CHECKING:
   from randomizer import WWRandomizer
 
@@ -256,6 +257,15 @@ class Logic:
     
     return max_banned_locations
   
+  def get_max_dungeon_item_locations(self)-> dict[str, int]:
+    # Calculate the number remaining dungeon items to place per dungeon
+    num_required_dungeon_checks = {dungeon: 0 for dungeon in self.DUNGEON_NAMES.values()}
+    for it in self.unplaced_progress_items + self.unplaced_nonprogress_items:
+      if it in DUNGEON_NONPROGRESS_ITEMS + DUNGEON_PROGRESS_ITEMS:
+        dungeon_name = self.DUNGEON_NAMES[it.split(" ")[0]]
+        num_required_dungeon_checks[dungeon_name] += 1
+    return num_required_dungeon_checks
+  
   def get_progress_and_non_progress_locations(self):
     all_locations = self.item_locations.keys()
     progress_locations = self.filter_locations_for_progression(all_locations, filter_sunken_treasure=True)
@@ -316,7 +326,7 @@ class Logic:
     self.clear_req_caches()
   
   @contextmanager
-  def add_temporary_items(self, item_names):
+  def add_temporary_items(self, item_names: Iterable[str]):
     for item_name in item_names:
       self.add_owned_item(item_name)
     
@@ -325,8 +335,8 @@ class Logic:
     for item_name in item_names:
       self.remove_owned_item(item_name)
   
-  def get_accessible_remaining_locations(self, *, for_progression):
-    accessible_location_names = []
+  def get_accessible_remaining_locations(self, *, for_progression) -> list[str]:
+    accessible_location_names: list[str] = []
     
     locations_to_check = self.remaining_item_locations
     if for_progression:
@@ -390,6 +400,7 @@ class Logic:
     for location_name in inaccessible_undone_item_locations:
       requirement_expression = self.item_locations[location_name]["Need"]
       item_names_for_loc = self.get_item_names_from_logical_expression_req(requirement_expression)
+      #print(f"Items for {location_name}: {item_names_for_loc}")
       item_names_for_all_locations.append(item_names_for_loc)
     item_names_to_beat_game = self.get_item_names_by_req_name("Can Reach and Defeat Ganondorf")
     item_names_for_all_locations.append(item_names_to_beat_game)
@@ -479,7 +490,7 @@ class Logic:
     self.cached_items_are_useful[item_name] = False
     return False
   
-  def filter_locations_for_progression(self, locations_to_filter, filter_sunken_treasure=False):
+  def filter_locations_for_progression(self, locations_to_filter: list[str], filter_sunken_treasure=False) -> list[str]:
     return Logic.filter_locations_for_progression_static(
       locations_to_filter,
       self.item_locations,
@@ -488,8 +499,8 @@ class Logic:
     )
   
   @staticmethod
-  def filter_locations_for_progression_static(locations_to_filter: list[str], item_locations: dict[str, dict], options: Options, filter_sunken_treasure=False):
-    filtered_locations = []
+  def filter_locations_for_progression_static(locations_to_filter: list[str], item_locations: dict[str, dict], options: Options, filter_sunken_treasure=False) -> list[str]:
+    filtered_locations: list[str] = []
     for location_name in locations_to_filter:
       types = item_locations[location_name]["Types"]
       if "No progression" in types:
@@ -714,6 +725,15 @@ class Logic:
       zone_access_macro_name = "Can Access " + zone_exit.unique_name
       self.set_macro(zone_access_macro_name, can_access_all_entrances)
   
+  @contextmanager
+  def temporarily_make_one_exit_accessible(self, exit_name: str):
+    access_macro_name = "Can Access " + exit_name
+    saved_macro = self.macros[access_macro_name]
+    self.set_macro(access_macro_name, "Nothing")
+    yield
+    self.macros[access_macro_name] = saved_macro
+    self.clear_req_caches()
+  
   def update_chart_macros(self):
     # Update all the "Chart for Island" macros to take randomized charts into account.
     for island_number in range(1, 49+1):
@@ -840,8 +860,12 @@ class Logic:
     
     return zone_name, specific_location_name
   
-  def is_dungeon_item(self, item_name):
-    return (item_name in DUNGEON_PROGRESS_ITEMS or item_name in DUNGEON_NONPROGRESS_ITEMS)
+  def is_dungeon_item(self, item_name, dungeon_name_to_match=None) -> bool:
+    if not (item_name in DUNGEON_PROGRESS_ITEMS or item_name in DUNGEON_NONPROGRESS_ITEMS):
+      return False
+    if not dungeon_name_to_match:
+      return True
+    return self.DUNGEON_NAMES[item_name.split(" ")[0]] == dungeon_name_to_match
   
   def is_dungeon_location(self, location_name, dungeon_name_to_match=None):
     zone_name, specific_location_name = self.split_location_name_by_zone(location_name)
@@ -1311,3 +1335,54 @@ class Logic:
         subset_item_combo, orig_req_expression,
         matched_combos, checked_combos,
       )
+  
+  def get_all_accessible_locs_in_dungeon_with_key_logic(self, dungeon: str) -> tuple[list[str],int]:
+    # Returns the accessible locations and the number of keys that must be assigned
+    if not self.options.progression_dungeons:
+      raise Exception("get_all_accessible_locs_in_dungeon_with_key_logic called on non-progress dungeon")
+
+    # We need to figure out if the restrictions on key placement will guarantee additional available progression locations
+    # To do that, we check that all inaccessible locations in the dungeon require at least one more key.
+    # That would mean that a key must be assigned in the already accessible locations
+    all_progress_locs_in_dungeon = self.filter_locations_for_progression([
+      loc for loc in self.remaining_item_locations
+      if self.is_dungeon_location(loc, dungeon_name_to_match=dungeon)
+      # Since this might run before entrance randomizer, ignore locations that can be somewhere else
+      and "Randomizable Miniboss Room" not in self.item_locations[loc]["Types"]
+      and "Boss" not in self.item_locations[loc]["Types"]
+    ])
+    accessible_locs = [
+      loc for loc in all_progress_locs_in_dungeon
+      if self.check_location_accessible(loc)
+    ]
+    if not accessible_locs:
+      # No locations at all, so in particular no location with a guaranteed key
+      return accessible_locs, 0
+    if self.options.keylunacy:
+      return accessible_locs, 0
+    # It doesn't seem to be necessary to check big keys here, even with entrance randomizer
+    # In most dungeons it's locked by all small keys, with exceptions:
+    # DRC with precise/obscure logic (but there are enough locations before the door to make it irrelevant)
+    # FW (enough locations accessible if the boss door is accessible to make it irrelevant)
+    dungeon_key_name = self.DUNGEON_NAME_TO_SHORT_DUNGEON_NAME[dungeon] + " Small Key"
+    unknown_keys = self.unplaced_progress_items.count(dungeon_key_name)
+    guaranteed_keys = 0
+    with contextlib.ExitStack() as key_stack:
+      while unknown_keys > 0:
+        inaccessible_locs = [loc for loc in all_progress_locs_in_dungeon if loc not in accessible_locs]
+        potential_inaccessible_keys = 0
+        for loc in inaccessible_locs:
+          items = self.get_item_names_from_logical_expression_req(self.item_locations[loc]["Need"])
+          if not any(it.endswith(" Small Key") for it in items):
+            potential_inaccessible_keys += 1
+        if potential_inaccessible_keys >= unknown_keys:
+          return accessible_locs, guaranteed_keys
+        
+        # At least one key is guaranteed reachable, assume we got it
+        key_stack.enter_context(self.add_temporary_items([dungeon_key_name]))
+        unknown_keys -= 1
+        guaranteed_keys += 1
+        new_accessible_locs = [loc for loc in inaccessible_locs if self.check_location_accessible(loc)]
+        accessible_locs += new_accessible_locs
+    
+    return accessible_locs, guaranteed_keys
