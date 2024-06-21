@@ -10,7 +10,7 @@ def dry_rando_with_options(options) -> WWRandomizer:
   rando_kwargs = {
     "seed": "pytestseed",
     "clean_iso_path": None,
-    "randomized_output_folder": os.environ["WW_RANDO_OUTPUT_DIR"],
+    "randomized_output_folder": os.environ.get("WW_RANDO_OUTPUT_DIR", "./rando_output"),
     "options": options,
     "cmd_line_args": args,
   }
