@@ -1,4 +1,3 @@
-import typing
 from logic.item_types import DUNGEON_PROGRESS_ITEMS
 
 from randomizers.base_randomizer import BaseRandomizer
@@ -65,10 +64,7 @@ class ExtraStartingItemsRandomizer(BaseRandomizer):
       selected = self.rng.choice(available_items)
       
       if selected in ("Treasure Chart", "Triforce Chart"):
-        chart_usefulness = self.logic.get_items_by_usefulness_fraction(
-          self.logic.treasure_chart_names + self.logic.triforce_chart_names,
-          filter_sunken_treasure=False,
-        )
+        chart_usefulness = self.logic.get_items_by_usefulness_fraction(self.logic.treasure_chart_names + self.logic.triforce_chart_names)
         selected = self.rng.choice([
           chart for chart in self.logic.unplaced_progress_items
           if chart.startswith(selected) and chart in chart_usefulness and chart_usefulness[chart] <= max_fraction
@@ -91,11 +87,7 @@ class ExtraStartingItemsRandomizer(BaseRandomizer):
       
   def filter_possible_random_starting_items(self, max_fraction: int) -> list[str]:
     item_names_to_check = self.logic.unplaced_progress_items.copy()
-    need_sunken_treasure = any(item.startswith("Treasure Chart ") or item.startswith("Triforce Chart ") for item in item_names_to_check)
-    items_by_usefulness = self.logic.get_items_by_usefulness_fraction(
-      item_names_to_check,
-      filter_sunken_treasure=(not need_sunken_treasure),
-    )
+    items_by_usefulness = self.logic.get_items_by_usefulness_fraction(item_names_to_check)
     available_items: set[str] = set()
     for item, fraction in items_by_usefulness.items():
       if fraction <= max_fraction:

@@ -629,7 +629,7 @@ class HintsRandomizer(BaseRandomizer):
     # Items are implicitly referred to by their location to handle duplicate item names (i.e., progressive items and
     # small keys). Basically, we remove the item from that location and see if the seed is still beatable. If not, then
     # we consider the item as required.
-    progress_locations, non_progress_locations = self.logic.get_progress_and_non_progress_locations()
+    progress_locations = self.logic.get_progress_locations()
     for location_name in progress_locations:
       item_name = self.logic.done_item_locations[location_name]
       
@@ -908,7 +908,7 @@ class HintsRandomizer(BaseRandomizer):
   def generate_octo_fairy_hint(self):
     # Get an item hint for a random progress item.
     # Note that this hint is completely independant of all other hints.
-    progress_locations, non_progress_locations = self.logic.get_progress_and_non_progress_locations()
+    progress_locations = self.logic.get_progress_locations()
     hintable_locations = self.get_legal_item_hints(progress_locations, [], [])
     if "Two-Eye Reef - Big Octo Great Fairy" in hintable_locations:
       # We don't want this Great Fairy to hint at her own item.
@@ -933,7 +933,7 @@ class HintsRandomizer(BaseRandomizer):
     self.chart_name_to_sunken_treasure = self.rando.charts.build_chart_to_sunken_treasure_location_mapping()
     
     # Build of list of progress locations for this seed.
-    progress_locations, non_progress_locations = self.logic.get_progress_and_non_progress_locations()
+    progress_locations = self.logic.get_progress_locations()
     
     # Get all entrance zones for progress locations in this seed.
     all_world_areas = []

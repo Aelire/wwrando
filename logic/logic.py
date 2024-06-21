@@ -222,8 +222,9 @@ class Logic:
     if not self.options.required_bosses:
       return 0
     
-    all_locations = self.item_locations.keys()
-    progress_locations = self.filter_locations_for_progression(all_locations)
+    # Called before any randomization, but sunken treasure is irrelevant as they're not inside dungeons
+    progress_locations = self.filter_locations_for_progression_static(
+      list(self.item_locations.keys()), self.item_locations, self.options, filter_sunken_treasure=True)
     location_counts_by_dungeon = {}
     
     for location_name in progress_locations:
@@ -256,30 +257,12 @@ class Logic:
     
     return max_banned_locations
   
+  def get_progress_locations(self):
+    return self.filter_locations_for_progression(list(self.item_locations.keys()))
+
   def get_progress_and_non_progress_locations(self):
-    all_locations = self.item_locations.keys()
-    progress_locations = self.filter_locations_for_progression(all_locations, filter_sunken_treasure=True)
-    nonprogress_locations = []
-    for location_name in all_locations:
-      if location_name in progress_locations:
-        continue
-      
-      types = self.item_locations[location_name]["Types"]
-      if "Sunken Treasure" in types:
-        chart_name = self.chart_name_for_location(location_name)
-        if "Triforce Chart" in chart_name:
-          if self.options.progression_triforce_charts:
-            progress_locations.append(location_name)
-          else:
-            nonprogress_locations.append(location_name)
-        else:
-          if self.options.progression_treasure_charts:
-            progress_locations.append(location_name)
-          else:
-            nonprogress_locations.append(location_name)
-      else:
-        nonprogress_locations.append(location_name)
-    
+    progress_locations = self.get_progress_locations()
+    nonprogress_locations = [loc for loc in self.item_locations.keys() if loc not in progress_locations]
     return (progress_locations, nonprogress_locations)
   
   def add_owned_item(self, item_name):
@@ -344,8 +327,7 @@ class Logic:
     
     accessible_undone_locations = self.get_accessible_remaining_locations(for_progression=True)
     inaccessible_undone_item_locations = []
-    locations_to_check = self.remaining_item_locations
-    locations_to_check = self.filter_locations_for_progression(locations_to_check)
+    locations_to_check = self.filter_locations_for_progression(self.remaining_item_locations)
     for location_name in locations_to_check:
       if location_name not in accessible_undone_locations:
         inaccessible_undone_item_locations.append(location_name)
@@ -362,7 +344,7 @@ class Logic:
     
     return None
   
-  def get_items_by_usefulness_fraction(self, item_names_to_check, *, filter_sunken_treasure):
+  def get_items_by_usefulness_fraction(self, item_names_to_check):
     # Takes a list of items and locations, and determines for each item what the lowest number of items including it the player needs before a new location is opened up, and returns that in a dict.
     # For example, say there are 3 items A B and C, and 2 locations X and Y.
     # Location X requires items A and B while location Y requires items A B and C.
@@ -371,8 +353,7 @@ class Logic:
     
     accessible_undone_locations = self.get_accessible_remaining_locations(for_progression=True)
     inaccessible_undone_item_locations = []
-    locations_to_check = self.remaining_item_locations
-    locations_to_check = self.filter_locations_for_progression(locations_to_check, filter_sunken_treasure=filter_sunken_treasure)
+    locations_to_check = self.filter_locations_for_progression(self.remaining_item_locations)
     for location_name in locations_to_check:
       if location_name not in accessible_undone_locations:
         if location_name in self.rando.boss_reqs.banned_locations:
@@ -479,13 +460,32 @@ class Logic:
     self.cached_items_are_useful[item_name] = False
     return False
   
-  def filter_locations_for_progression(self, locations_to_filter, filter_sunken_treasure=False):
-    return Logic.filter_locations_for_progression_static(
+  def filter_locations_for_progression(self, locations_to_filter: list[str], filter_sunken_treasure=False) -> list[str]:
+    need_any_charts = (self.options.progression_treasure_charts or self.options.progression_triforce_charts)
+    # force filtering out sunken treasure if they are known to not be required, avoids the loop below
+    filter_sunken_treasure = filter_sunken_treasure or not need_any_charts
+    progress_locations = Logic.filter_locations_for_progression_static(
       locations_to_filter,
       self.item_locations,
       self.options,
       filter_sunken_treasure=filter_sunken_treasure
     )
+    if not filter_sunken_treasure:
+      if self.options.randomize_charts and not self.rando.charts.made_any_changes:
+        raise Exception("Trying to get sunken treasure progression before charts randomizer runs")
+      # at least some of the sunken treasure locations are progression, but not necessarily all
+      # So we need to filter based on the charts randomizer as well as progression options
+      for location_name in progress_locations:
+        types = self.item_locations[location_name]["Types"]
+        if "Sunken Treasure" in types:
+          chart_name = self.chart_name_for_location(location_name)
+          if "Triforce Chart" in chart_name:
+            if not self.options.progression_triforce_charts:
+              progress_locations.remove(location_name)
+          else:
+            if not self.options.progression_treasure_charts:
+              progress_locations.remove(location_name)
+    return progress_locations
   
   @staticmethod
   def filter_locations_for_progression_static(locations_to_filter: list[str], item_locations: dict[str, dict], options: Options, filter_sunken_treasure=False):
@@ -759,15 +759,20 @@ class Logic:
       # Required bosses mode also hasn't decided on which bosses to make required, so assume the worst case here too.
       self.temporarily_make_required_bosses_macro_worst_case_scenario()
     
-    filter_sunken_treasure = True
-    if self.options.progression_triforce_charts or self.options.progression_treasure_charts:
-      filter_sunken_treasure = False
-    progress_locations = Logic.filter_locations_for_progression_static(
-      self.item_locations.keys(),
-      self.item_locations,
-      self.options,
-      filter_sunken_treasure=filter_sunken_treasure
-    )
+    if not self.rando.charts.is_enabled():
+      # Chart mappings are already correct and can be used to filter progression locations
+      progress_locations = self.get_progress_locations()
+    else:
+      # This is the equivalent of entrance macro worst case scenario for charts, assumes all sunken treasure is potentially required
+      filter_sunken_treasure = True
+      if self.options.progression_triforce_charts or self.options.progression_treasure_charts:
+        filter_sunken_treasure = False
+      progress_locations = Logic.filter_locations_for_progression_static(
+        self.item_locations.keys(),
+        self.item_locations,
+        self.options,
+        filter_sunken_treasure=filter_sunken_treasure
+      )
     
     items_needed = {}
     for location_name in progress_locations:

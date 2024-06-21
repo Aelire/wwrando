@@ -290,10 +290,7 @@ class ItemRandomizer(BaseRandomizer):
             # In other words, which item has the smallest number of other items needed before it becomes useful?
             # We'd prefer to place an item which is 1/2 of what you need to access a new location over one which is 1/5 for example.
             
-            item_by_usefulness_fraction = self.logic.get_items_by_usefulness_fraction(
-              possible_items,
-              filter_sunken_treasure=False,
-            )
+            item_by_usefulness_fraction = self.logic.get_items_by_usefulness_fraction(possible_items)
             
             # We want to limit it to choosing items at the maximum usefulness fraction.
             # Since the values we have are the denominator of the fraction, we actually call min() instead of max().
@@ -632,7 +629,7 @@ class ItemRandomizer(BaseRandomizer):
           raise Exception("Failed to calculate progression spheres")
         else:
           remaining_inaccessible_locations = [
-            loc for loc in logic.filter_locations_for_progression(logic.remaining_item_locations, filter_sunken_treasure=True)
+            loc for loc in logic.filter_locations_for_progression(logic.remaining_item_locations)
             if loc not in previously_accessible_locations
           ]
           if remaining_inaccessible_locations:
