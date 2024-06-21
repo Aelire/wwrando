@@ -244,29 +244,6 @@ class WWRandomizer:
       error_message += "\nYou need to check more of the progress location options in order to give the randomizer enough space to place all the items."
       raise TooFewProgressionLocationsError(error_message)
     
-    # We need to determine if the user's selected options result in a dungeons-only-start.
-    # Dungeons-only-start meaning that the only locations accessible at the start of the run are dungeon locations.
-    # e.g. If the user selects Dungeons, Expensive Purchases, and Sunken Treasures, the dungeon locations are the only ones the player can check first.
-    # We need to distinguish this situation because it can cause issues for the randomizer's item placement logic (specifically when placing keys in DRC).
-    self.logic.temporarily_make_dungeon_entrance_macros_impossible()
-    accessible_undone_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
-    if len(accessible_undone_locations) == 0:
-      self.dungeons_only_start = True
-    else:
-      self.dungeons_only_start = False
-    self.logic.update_entrance_connection_macros() # Reset the dungeon entrance macros.
-    
-    # Also determine if these options result in a dungeons-and-caves-only-start.
-    # Dungeons-and-caves-only-start means the only locations accessible at the start of the run are dungeon or secret cave locations.
-    # This situation can also cause issues for the item placement logic (specifically when placing the first item of the run).
-    self.logic.temporarily_make_entrance_macros_impossible()
-    accessible_undone_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
-    if len(accessible_undone_locations) == 0:
-      self.dungeons_and_caves_only_start = True
-    else:
-      self.dungeons_and_caves_only_start = False
-    self.logic.update_entrance_connection_macros() # Reset the entrance macros.
-    
     self.fully_initialized = True
   
   def get_max_progress_length(self) -> int:

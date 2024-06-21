@@ -14,6 +14,7 @@ class ItemRandomizer(BaseRandomizer):
   def __init__(self, rando):
     super().__init__(rando)
     
+    self.dungeons_only_start = False
     self.drc_failsafe_location = None
   
   def is_enabled(self) -> bool:
@@ -85,6 +86,10 @@ class ItemRandomizer(BaseRandomizer):
   #region Randomization
   def randomize_dungeon_items(self):
     # Places dungeon-specific items first so all the dungeon locations don't get used up by other items.
+    self.dungeons_only_start = all(
+      self.logic.is_dungeon_location(loc)
+      for loc in self.logic.get_accessible_remaining_locations(for_progression=True)
+    )
     
     # Temporarily add all items except for dungeon keys while we randomize them.
     items_to_temporarily_add = [
@@ -98,7 +103,7 @@ class ItemRandomizer(BaseRandomizer):
     # This is for when dungeons are nested. Simply having all items except keys isn't enough if a dungeon is locked behind another dungeon.
     self.logic.temporarily_make_dungeon_entrance_macros_accessible()
     
-    if self.rando.dungeons_and_caves_only_start:
+    if self.dungeons_only_start:
       # Choose a random location out of the 6 easiest locations to access in DRC.
       # This location will not have the big key, dungeon map, or compass on this seed. (But can still have small keys/non-dungeon items.)
       # This is to prevent a rare error in dungeons-only-start.
@@ -169,14 +174,14 @@ class ItemRandomizer(BaseRandomizer):
     
     possible_locations = self.logic.filter_locations_valid_for_item(accessible_undone_locations, item_name)
     
-    if self.rando.dungeons_and_caves_only_start and item_name == "DRC Small Key":
+    if self.dungeons_only_start and item_name == "DRC Small Key":
       # If we're in a dungeons-only-start, we have to ban small keys from appearing in the path that sequence breaks the hanging platform.
       # A key you need to progress appearing there can cause issues that dead-end the item placement logic when there are no locations outside DRC for the randomizer to give you other items at.
       possible_locations = [
         loc for loc in possible_locations
         if loc not in ["Dragon Roost Cavern - Big Key Chest", "Dragon Roost Cavern - Tingle Statue Chest"]
       ]
-    if self.rando.dungeons_and_caves_only_start and item_name in ["DRC Big Key", "DRC Dungeon Map", "DRC Compass"]:
+    if self.dungeons_only_start and item_name in ["DRC Big Key", "DRC Dungeon Map", "DRC Compass"]:
       # If we're in a dungeons-only start, we have to ban dungeon items except small keys from appearing in all 6 of the 6 easiest locations to access in DRC.
       # If we don't do this, there is a small chance that those 6 locations will be filled with 3 small keys, the dungeon map, and the compass. The 4th small key will be in the path that sequence breaks the hanging platform, but there will be no open spots to put any non-dungeon items like grappling hook.
       # To prevent this specific problem, one location (chosen randomly) is not allowed to have these items at all in dungeons-only-start. It can still have small keys and non-dungeon items.
