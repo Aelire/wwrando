@@ -460,21 +460,23 @@ class Logic:
     self.cached_items_are_useful[item_name] = False
     return False
   
-  def filter_locations_for_progression(self, locations_to_filter: list[str], filter_sunken_treasure=False) -> list[str]:
+  def filter_locations_for_progression(self, locations_to_filter: list[str]) -> list[str]:
+    # Always throw here so that bugs don't only surface when sunken treasure progression is on
+    if self.options.randomize_charts and not self.rando.charts.made_any_changes:
+      raise Exception("Trying to get sunken treasure progression before charts randomizer runs."
+                      "Use the static version of the function before Logic is fully initialized")
+
     need_any_charts = (self.options.progression_treasure_charts or self.options.progression_triforce_charts)
     # force filtering out sunken treasure if they are known to not be required, avoids the loop below
-    filter_sunken_treasure = filter_sunken_treasure or not need_any_charts
     progress_locations = Logic.filter_locations_for_progression_static(
       locations_to_filter,
       self.item_locations,
       self.options,
-      filter_sunken_treasure=filter_sunken_treasure
+      filter_sunken_treasure=not need_any_charts
     )
-    if not filter_sunken_treasure:
-      if self.options.randomize_charts and not self.rando.charts.made_any_changes:
-        raise Exception("Trying to get sunken treasure progression before charts randomizer runs")
+    if need_any_charts:
       # at least some of the sunken treasure locations are progression, but not necessarily all
-      # So we need to filter based on the charts randomizer as well as progression options
+      # So we need to filter based on the charts randomizer results as well as progression options
       for location_name in progress_locations:
         types = self.item_locations[location_name]["Types"]
         if "Sunken Treasure" in types:
