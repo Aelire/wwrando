@@ -21,6 +21,7 @@ from randomizer import WWRandomizer, TooFewProgressionLocationsError, InvalidCle
 from version import VERSION
 from wwrando_paths import SETTINGS_PATH, ASSETS_PATH, IS_RUNNING_FROM_SOURCE, RANDO_ROOT_PATH
 from seedgen import seedgen
+from logic.expressions.parser import load_and_parse_item_locations
 from logic.logic import Logic
 
 import typing
@@ -71,7 +72,7 @@ class WWRandomizerWindow(QMainWindow):
     
     self.load_settings()
     
-    self.cached_item_locations = Logic.load_and_parse_item_locations()
+    self.cached_item_locations = load_and_parse_item_locations(skip_parsing_reqs=True, known_macros=[])
     
     self.ui.starting_pohs.valueChanged.connect(self.update_health_label)
     self.ui.starting_hcs.valueChanged.connect(self.update_health_label)

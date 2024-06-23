@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ruamel.yaml import YAML
 yaml = YAML(typ="safe")
 
+from logic.expressions.requirement import LogicRequirement, MacroReq, OtherLocationReq
 from logic.logic import Logic
 from randomizers.base_randomizer import BaseRandomizer
 from wwlib.dzx import DZx, ACTR, MULT
@@ -126,15 +127,15 @@ class HintsRandomizer(BaseRandomizer):
   
   # A dictionary mapping dungeon name to the requirement name.
   # This dictionary is used when determining which items are on the path to a goal.
-  DUNGEON_NAME_TO_REQUIREMENT_NAME = {
-    "Dragon Roost Cavern": "Can Access Item Location \"Dragon Roost Cavern - Gohma Heart Container\"",
-    "Forbidden Woods": "Can Access Item Location \"Forbidden Woods - Kalle Demos Heart Container\"",
-    "Tower of the Gods": "Can Access Item Location \"Tower of the Gods - Gohdan Heart Container\"",
-    "Forsaken Fortress": "Can Access Item Location \"Forsaken Fortress - Helmaroc King Heart Container\"",
-    "Earth Temple": "Can Access Item Location \"Earth Temple - Jalhalla Heart Container\"",
-    "Wind Temple": "Can Access Item Location \"Wind Temple - Molgera Heart Container\"",
-    "Hyrule": "Can Access Hyrule",
-    "Ganon's Tower": "Can Reach and Defeat Ganondorf",
+  DUNGEON_NAME_TO_REQUIREMENT: dict[str, LogicRequirement]= {
+    "Dragon Roost Cavern": OtherLocationReq("Dragon Roost Cavern - Gohma Heart Container"),
+    "Forbidden Woods": OtherLocationReq("Forbidden Woods - Kalle Demos Heart Container"),
+    "Tower of the Gods": OtherLocationReq("Tower of the Gods - Gohdan Heart Container"),
+    "Forsaken Fortress": OtherLocationReq("Forsaken Fortress - Helmaroc King Heart Container"),
+    "Earth Temple": OtherLocationReq("Earth Temple - Jalhalla Heart Container"),
+    "Wind Temple": OtherLocationReq("Wind Temple - Molgera Heart Container"),
+    "Hyrule": MacroReq("Can Access Hyrule"),
+    "Ganon's Tower": MacroReq("Can Reach and Defeat Ganondorf"),
   }
   
   HOHO_INDEX_TO_ISLAND_NUM = {
@@ -715,7 +716,7 @@ class HintsRandomizer(BaseRandomizer):
       previously_accessible_locations = accessible_locations
     
     requirements_met = {
-      path_name: not self.path_logic.check_requirement_met(self.DUNGEON_NAME_TO_REQUIREMENT_NAME[path_name])
+      path_name: not self.path_logic.check_requirement_met(self.DUNGEON_NAME_TO_REQUIREMENT[path_name])
       for path_name in paths_to_check
     }
     return requirements_met
@@ -818,7 +819,7 @@ class HintsRandomizer(BaseRandomizer):
     # and Defeat Ganondorf" requirement and checking items needed to fulfill that requirement. We then use a queue to
     # check item requirements to get those items, and so on.
     self.path_logic.load_simulated_playthrough_state(self.path_logic_initial_state)
-    items_needed = deque(self.path_logic.get_item_names_by_req_name("Can Reach and Defeat Ganondorf"))
+    items_needed = deque(self.path_logic.get_item_names_by_req(self.path_logic.COMPLETE_GAME_REQ))
     items_checked = []
     useful_locations = set()
     while len(items_needed) > 0:
@@ -838,8 +839,7 @@ class HintsRandomizer(BaseRandomizer):
       # Consider all instances of this item, even if those extra copies might not be required.
       item_locations = progress_items[item_name]
       for location_name in item_locations:
-        requirement_name = "Can Access Item Location \"%s\"" % location_name
-        other_items_needed = self.path_logic.get_item_names_by_req_name(requirement_name)
+        other_items_needed = self.path_logic.get_item_names_for_location(location_name)
         items_needed.extend(other_items_needed)
       
       # The set of "useful locations" is the set of all locations which contain these "useful" items.

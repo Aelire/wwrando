@@ -140,3 +140,8 @@ DUNGEON_NONPROGRESS_ITEMS = \
   ["FF Dungeon Map", "FF Compass"] + \
   ["ET Dungeon Map", "ET Compass"] + \
   ["WT Dungeon Map", "WT Compass"]
+
+TREASURE_CHARTS = [f"Treasure Chart {i}" for i in range(1, 41+1)]
+TRIFORCE_CHARTS = [f"Triforce Chart {i}" for i in range(1, 8+1)]
+
+ALL_UNIQUE_ITEMS = PROGRESS_ITEMS + NONPROGRESS_ITEMS + DUNGEON_PROGRESS_ITEMS + DUNGEON_NONPROGRESS_ITEMS + TREASURE_CHARTS + TRIFORCE_CHARTS

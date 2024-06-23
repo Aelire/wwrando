@@ -1,4 +1,5 @@
 import os
+from logic.expressions.requirement import MacroReq
 from wwrando import make_argparser
 from randomizer import WWRandomizer
 from options.wwrando_options import Options, TrickDifficulty
@@ -73,10 +74,10 @@ def test_trick_logic_checks():
   options.logic_obscurity = TrickDifficulty.HARD
   options.logic_precision = TrickDifficulty.NORMAL
   rando = dry_rando_with_options(options)
-  assert rando.logic.check_requirement_met("Obscure 2")
-  assert not rando.logic.check_requirement_met("Obscure 3")
-  assert rando.logic.check_requirement_met("Precise 1")
-  assert not rando.logic.check_requirement_met("Precise 2")
+  assert rando.logic.check_requirement_met(MacroReq("Obscure 2"))
+  assert not rando.logic.check_requirement_met(MacroReq("Obscure 3"))
+  assert rando.logic.check_requirement_met(MacroReq("Precise 1"))
+  assert not rando.logic.check_requirement_met(MacroReq("Precise 2"))
 
 def test_parse_string_option_to_enum():
   options = Options()

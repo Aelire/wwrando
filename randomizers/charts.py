@@ -116,7 +116,10 @@ class ChartRandomizer(BaseRandomizer):
     
     chart_name_to_island_number = {}
     for island_number in range(1, 49+1):
-      chart_name = self.logic.macros["Chart for Island %d" % island_number][0]
+      chart_req = self.logic.macros["Chart for Island %d" % island_number]
+      chart_name = [it for it in self.logic.get_items_needed_by_req(chart_req) if " Chart " in it]
+      assert len(chart_name) == 1
+      chart_name = chart_name[0]
       chart_name_to_island_number[chart_name] = island_number
     
     for chart_number in range(1, 49+1):
@@ -138,7 +141,10 @@ class ChartRandomizer(BaseRandomizer):
     
     chart_name_to_island_number = {}
     for island_number in range(1, 49+1):
-      chart_name = self.logic.macros["Chart for Island %d" % island_number][0]
+      chart_req = self.logic.macros["Chart for Island %d" % island_number]
+      chart_name = [it for it in self.logic.get_items_needed_by_req(chart_req) if " Chart " in it]
+      assert len(chart_name) == 1
+      chart_name = chart_name[0]
       chart_name_to_island_number[chart_name] = island_number
     
     chart_name_to_sunken_treasure = {}

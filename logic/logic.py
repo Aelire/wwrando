@@ -1,9 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
+
 if TYPE_CHECKING:
+  from collections.abc import Mapping
   from randomizer import WWRandomizer
 
-import re
 import copy
 import os
 from contextlib import contextmanager
@@ -11,6 +13,9 @@ from contextlib import contextmanager
 from ruamel.yaml import YAML
 yaml = YAML(typ="safe")
 
+from logic.expressions.graph_ops import recursive_children, expr_is_terminal
+from logic.expressions.requirement import And, Impossible, ItemReq, LogicRequirement, MacroReq, Nothing, OtherLocationReq
+from logic.expressions.parser import load_and_parse_item_locations, load_and_parse_macros, parse_logic_expression
 from logic.item_types import PROGRESS_ITEMS, NONPROGRESS_ITEMS, CONSUMABLE_ITEMS, DUPLICATABLE_CONSUMABLE_ITEMS, DUNGEON_PROGRESS_ITEMS, DUNGEON_NONPROGRESS_ITEMS
 from wwrando_paths import LOGIC_PATH
 from randomizers import entrances
@@ -29,19 +34,26 @@ class Logic:
   
   initial_item_locations = None
   initial_macros = None
+
+  COMPLETE_GAME_REQ = MacroReq("Can Reach and Defeat Ganondorf")
   
   def __init__(self, rando: WWRandomizer):
     self.rando = rando
     self.options = rando.options
     
     # Caches.
-    self.requirement_met_cache = {}
-    self.items_needed_cache = {}
     self.cached_enemies_tested_for_reqs_tuple = {}
     
     # Locations and requirements.
-    self.item_locations = Logic.load_and_parse_item_locations()
-    self.load_and_parse_macros()
+    if not self.initial_macros:
+      Logic.initial_macros = load_and_parse_macros()
+    if not self.initial_item_locations:
+      Logic.initial_item_locations = load_and_parse_item_locations(known_macros=Logic.initial_macros)
+    self.register_mutable_macros()
+    self.item_locations = copy.deepcopy(Logic.initial_item_locations)
+    self.compile_macros(Logic.initial_macros.copy())
+    for loc in self.item_locations:
+      self.item_locations[loc]["Need"] = self.item_locations[loc]["Need"].specialize_for_seed(self)
     
     self.nested_entrance_macros: dict[str, str] = {}
     
@@ -147,7 +159,6 @@ class Logic:
       self.add_owned_item(item_name)
     
     # Decide what will count as a progress item on these settings.
-    self.clear_req_caches()
     self.make_useless_progress_items_nonprogress()
     
     # Add the randomly-selected extra starting items (without incidence on other progress items).
@@ -158,12 +169,7 @@ class Logic:
         # for the purpose of hints or spoiler log progression.
         self.add_owned_item(item)
     
-    self.clear_req_caches()
     self.cached_enemies_tested_for_reqs_tuple.clear()
-  
-  def clear_req_caches(self):
-    self.requirement_met_cache.clear()
-    self.items_needed_cache.clear()
   
   def save_simulated_playthrough_state(self):
     vars_backup = {}
@@ -172,8 +178,6 @@ class Logic:
       "unplaced_progress_items",
       "unplaced_nonprogress_items",
       "unplaced_fixed_consumable_items",
-      "requirement_met_cache",
-      "items_needed_cache",
     ]:
       vars_backup[attr_name] = copy.deepcopy(getattr(self, attr_name))
     return vars_backup
@@ -298,8 +302,6 @@ class Logic:
     elif item_name in self.unplaced_fixed_consumable_items:
       self.unplaced_fixed_consumable_items.remove(item_name)
     
-    self.clear_req_caches()
-  
   def remove_owned_item(self, item_name):
     cleaned_item_name = self.clean_item_name(item_name)
     if cleaned_item_name not in self.all_cleaned_item_names:
@@ -315,8 +317,6 @@ class Logic:
       # Removing consumable items doesn't work because we don't know if the item is from the fixed list or the duplicatable list
       raise Exception("Cannot remove item from simulated inventory: %s" % item_name)
     
-    self.clear_req_caches()
-  
   @contextmanager
   def add_temporary_items(self, item_names):
     for item_name in item_names:
@@ -390,10 +390,9 @@ class Logic:
     # Note: Performance could be improved somewhat by only calculating which items are needed for each location at the start of item randomization, instead of once per call to this function. But this seems unnecessary.
     item_names_for_all_locations = []
     for location_name in inaccessible_undone_item_locations:
-      requirement_expression = self.item_locations[location_name]["Need"]
-      item_names_for_loc = self.get_item_names_from_logical_expression_req(requirement_expression)
+      item_names_for_loc = self.get_item_names_by_req(self.item_locations[location_name]["Need"])
       item_names_for_all_locations.append(item_names_for_loc)
-    item_names_to_beat_game = self.get_item_names_by_req_name("Can Reach and Defeat Ganondorf")
+    item_names_to_beat_game = self.get_item_names_by_req(self.COMPLETE_GAME_REQ)
     item_names_for_all_locations.append(item_names_to_beat_game)
     
     # Now calculate the best case scenario usefulness fraction for all items given.
@@ -623,74 +622,52 @@ class Logic:
         valid_items.append(item_name)
     return valid_items
   
-  @staticmethod
-  def load_and_parse_item_locations() -> dict[str, dict]:
-    if Logic.initial_item_locations is not None:
-      return copy.deepcopy(Logic.initial_item_locations)
-    
-    with open(os.path.join(LOGIC_PATH, "item_locations.txt")) as f:
-      item_locations = yaml.load(f)
-    
-    for location_name in item_locations:
-      req_string = item_locations[location_name]["Need"]
-      if req_string is None:
-        raise Exception("Requirements are blank for location \"%s\"" % location_name)
-      item_locations[location_name]["Need"] = Logic.parse_logic_expression(req_string)
+  def register_mutable_macros(self):
+    self.mutable_macros: set[str] = set()
+    #if entrances.EntranceRandomizer.is_enabled_by_options(self.options):
+    if True: # temporarily_make_entrance_macros_impossible is used unconditionally at rando initialization
+      for entrance_name in entrances.ZoneEntrance.all:
+        self.mutable_macros.add("Can Access " + entrance_name)
+      for zone_name in entrances.ZoneExit.all:
+        self.mutable_macros.add("Can Access " + zone_name)
+    if self.options.randomize_charts:
+      for island in range(1, 49+1):
+        self.mutable_macros.add(f"Chart for Island {island}")
+    if self.options.required_bosses:
+      self.mutable_macros.add("Can Defeat All Required Bosses")
       
-      types_string = item_locations[location_name]["Types"]
-      types = types_string.split(",")
-      types = [type.strip() for type in types]
-      item_locations[location_name]["Types"] = types
-    
-    Logic.initial_item_locations = copy.deepcopy(item_locations)
-    return item_locations
-    
-  def load_and_parse_macros(self):
-    if Logic.initial_macros is not None:
-      self.macros = copy.deepcopy(Logic.initial_macros)
-      return self.macros
-    
-    with open(os.path.join(LOGIC_PATH, "macros.txt")) as f:
-      macro_strings = yaml.load(f)
-    
-    self.macros = {}
-    for macro_name, req_string in macro_strings.items():
-      self.set_macro(macro_name, req_string)
-    
-    Logic.initial_macros = copy.deepcopy(self.macros)
-    return self.macros
-  
-  def set_macro(self, macro_name, req_string):
-    self.macros[macro_name] = Logic.parse_logic_expression(req_string)
-    self.clear_req_caches()
+  def set_macro(self, macro_name: str, req: LogicRequirement):
+    if macro_name not in self.mutable_macros:
+      raise ValueError(f"Attempting to update immutable macro {macro_name}")
+    self.macros[macro_name] = req.specialize_for_seed(self)
   
   def update_entrance_connection_macros(self):
     # Update all the macros to take randomized entrances into account.
     for entrance_name, zone_name in self.rando.entrances.entrance_connections.items():
       zone_access_macro_name = "Can Access " + zone_name
       entrance_access_macro_name = "Can Access " + entrance_name
-      self.set_macro(zone_access_macro_name, entrance_access_macro_name)
+      self.set_macro(zone_access_macro_name, MacroReq(entrance_access_macro_name))
   
   def temporarily_make_dungeon_entrance_macros_impossible(self):
     # Update all the dungeon access macros to be considered "Impossible".
     # Useful when the item randomizer is deciding how to place keys in DRC.
     for zone_exit in entrances.DUNGEON_EXITS:
       dungeon_access_macro_name = "Can Access " + zone_exit.unique_name
-      self.set_macro(dungeon_access_macro_name, "Impossible")
+      self.set_macro(dungeon_access_macro_name, Impossible)
   
   def temporarily_make_dungeon_entrance_macros_accessible(self):
     # Update all the dungeon access macros to be considered "Nothing".
     # Useful when the item randomizer is deciding how to place keys and the dungeons are nested.
     for zone_exit in entrances.DUNGEON_EXITS:
       dungeon_access_macro_name = "Can Access " + zone_exit.unique_name
-      self.set_macro(dungeon_access_macro_name, "Nothing")
+      self.set_macro(dungeon_access_macro_name, Nothing)
   
   def temporarily_make_entrance_macros_impossible(self):
     # Update all the dungeon/secret cave access macros to be considered "Impossible".
     # Useful when the entrance randomizer is selecting which dungeons/secret caves should be allowed where.
     for entrance_name, zone_name in self.rando.entrances.entrance_connections.items():
       zone_access_macro_name = "Can Access " + zone_name
-      self.set_macro(zone_access_macro_name, "Impossible")
+      self.set_macro(zone_access_macro_name, Impossible)
   
   def temporarily_make_entrance_macros_worst_case_scenario(self):
     # Update all the dungeon/secret cave access macros to be a combination of all the macros for
@@ -699,36 +676,41 @@ class Logic:
       self.temporarily_make_one_set_of_entrance_macros_worst_case_scenario(relevant_entrances, relevant_exits)
   
   def temporarily_make_one_set_of_entrance_macros_worst_case_scenario(self, relevant_entrances, relevant_exits):
-    all_entrance_access_macro_names = []
+    all_entrance_access_macros: set[MacroReq] = set()
     for entrance in relevant_entrances:
       entrance_access_macro_name = "Can Access " + entrance.entrance_name
-      assert self.macros[entrance_access_macro_name] != ["Impossible"]
-      all_entrance_access_macro_names.append(entrance_access_macro_name)
-    can_access_all_entrances = " & ".join(all_entrance_access_macro_names)
+      assert self.macros[entrance_access_macro_name] != Impossible
+      all_entrance_access_macros.add(MacroReq(entrance_access_macro_name))
+    can_access_all_entrances = And.from_iterable(all_entrance_access_macros)
     for zone_exit in relevant_exits:
       zone_access_macro_name = "Can Access " + zone_exit.unique_name
       self.set_macro(zone_access_macro_name, can_access_all_entrances)
   
   def update_chart_macros(self):
     # Update all the "Chart for Island" macros to take randomized charts into account.
+    if not self.rando.charts.is_enabled():
+      # Use default macros
+      return
+
     for island_number in range(1, 49+1):
       chart_macro_name = "Chart for Island %d" % island_number
       chart_item_name = self.rando.charts.island_number_to_chart_name[island_number]
       
       if "Triforce Chart" in chart_item_name:
-        req_string = "%s & Any Wallet Upgrade" % chart_item_name
+        req = And.from_elements(ItemReq(chart_item_name), MacroReq("Any Wallet Upgrade"))
       else:
-        req_string = chart_item_name
+        req = ItemReq(chart_item_name)
       
-      self.set_macro(chart_macro_name, req_string)
+      self.set_macro(chart_macro_name, req)
   
   def update_required_bosses_macro(self):
+    if not self.rando.boss_reqs.is_enabled():
+      return
     required_boss_reqs = [
-      f"Can Access Item Location \"{loc}\""
+      OtherLocationReq(loc)
       for loc in self.rando.boss_reqs.required_boss_item_locations
     ]
-    req_string = " & ".join(required_boss_reqs)
-    self.set_macro("Can Defeat All Required Bosses", req_string)
+    self.set_macro("Can Defeat All Required Bosses", And.from_iterable(required_boss_reqs))
   
   def temporarily_make_required_bosses_macro_worst_case_scenario(self):
     possible_boss_item_locations = [
@@ -736,11 +718,10 @@ class Logic:
       if "Boss" in self.item_locations[loc]["Types"]
     ]
     required_boss_reqs = [
-      f"Can Access Item Location \"{loc}\""
+      OtherLocationReq(loc)
       for loc in possible_boss_item_locations
     ]
-    req_string = " & ".join(required_boss_reqs)
-    self.set_macro("Can Defeat All Required Bosses", req_string)
+    self.set_macro("Can Defeat All Required Bosses", And.from_iterable(required_boss_reqs))
   
   def clean_item_name(self, item_name):
     # Remove parentheses from any item names that may have them. (Formerly Master Swords, though that's not an issue anymore.)
@@ -774,12 +755,12 @@ class Logic:
     items_needed = {}
     for location_name in progress_locations:
       requirement_expression = self.item_locations[location_name]["Need"]
-      sub_items_needed = self.get_items_needed_from_logical_expression_req(requirement_expression)
+      sub_items_needed = self.get_items_needed_by_req(requirement_expression)
       for item_name, num_required in sub_items_needed.items():
-        items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-    sub_items_needed = self.get_items_needed_by_req_name("Can Reach and Defeat Ganondorf")
+        items_needed[item_name] = max(num_required, items_needed.get(item_name, 0))
+    sub_items_needed = self.get_items_needed_by_req(self.COMPLETE_GAME_REQ)
     for item_name, num_required in sub_items_needed.items():
-      items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
+      items_needed[item_name] = max(num_required, items_needed.get(item_name, 0))
     
     useful_items = self.flatten_items_needed_to_item_names(items_needed)
     
@@ -851,289 +832,43 @@ class Logic:
       return False
     return True
   
-  @staticmethod
-  def parse_logic_expression(string: str):
-    tokens = [substring.strip() for substring in re.split("([&|()])", string)]
-    tokens = [token for token in tokens if token != ""]
-    
-    stack = []
-    for token in tokens:
-      if token == "(":
-        stack.append("(")
-      elif token == ")":
-        nested_tokens = []
-        
-        nested_parentheses_level = 0
-        while len(stack) != 0:
-          exp = stack.pop()
-          if exp == "(":
-            if nested_parentheses_level == 0:
-              break
-            else:
-              nested_parentheses_level -= 1
-          if exp == ")":
-            nested_parentheses_level += 1
-          nested_tokens.append(exp)
-        
-        nested_tokens.reverse()
-        stack.append("(")
-        stack.append(nested_tokens)
-        stack.append(")")
-      else:
-        stack.append(token)
-    
-    return stack
-  
-  def check_requirement_met(self, req_name: str, reqs_being_checked=None):
-    if req_name in self.requirement_met_cache:
-      return self.requirement_met_cache[req_name]
-    
-    # Prevent infinite recursion for cases where nested requirements depend on themselves.
-    # (e.g. temporarily_make_entrance_macros_worst_case_scenario)
-    if reqs_being_checked is None:
-      reqs_being_checked = set()
-    if req_name in self.nested_entrance_macros and self.nested_entrance_macros[req_name] in reqs_being_checked:
-      # If the logic says that, for example, TotG's dungeon entrance relies on TotG's boss entrance,
-      # we know this can't ever actually happen ingame as it would be an infinite loop.
-      # Thus we can safely just ignore this particular subtree in our search, as it is irrelevant.
-      return True
-    # print(f"{' '*len(reqs_being_checked)}{req_name}")
-    assert req_name not in reqs_being_checked, f"Recursive requirement check on non-whitelisted macro: {req_name!r}, {reqs_being_checked}"
-    reqs_being_checked.add(req_name)
-    
-    if req_name.startswith("Progressive "):
-      result = self.check_progressive_item_req(req_name)
-    elif " Small Key x" in req_name:
-      result = self.check_small_key_req(req_name)
-    elif req_name.startswith("Can Access Item Location \""):
-      result = self.check_item_location_requirement(req_name)
-    elif req_name.startswith("Option \""):
-      result = self.check_option_enabled_requirement(req_name)
-    elif req_name in self.all_cleaned_item_names:
-      result = req_name in self.currently_owned_items
-    elif req_name in self.macros:
-      logical_expression = self.macros[req_name]
-      result = self.check_logical_expression_req(logical_expression, reqs_being_checked=reqs_being_checked)
-    elif req_name == "Nothing":
-      result = True
-    elif req_name == "Impossible":
-      result = False
-    else:
-      raise Exception("Unknown requirement name: " + req_name)
-    
-    reqs_being_checked.remove(req_name)
-    
-    self.requirement_met_cache[req_name] = result
-    return result
-  
-  def check_logical_expression_req(self, logical_expression, reqs_being_checked=None):
-    expression_type = None
-    subexpression_results = []
-    tokens = logical_expression.copy()
-    tokens.reverse()
-    prev_token = None
-    while tokens:
-      token = tokens.pop()
-      if token == "|":
-        if expression_type == "AND":
-          raise Exception(f"Error parsing progression requirements: & and | must not be within the same nesting level. Expression: {logical_expression}")
-        expression_type = "OR"
-      elif token == "&":
-        if expression_type == "OR":
-          raise Exception(f"Error parsing progression requirements: & and | must not be within the same nesting level. Expression: {logical_expression}")
-        expression_type = "AND"
-      elif token == "(":
-        assert prev_token in [None, "&", "|"], f"Invalid expression: {logical_expression}"
-        nested_expression = tokens.pop()
-        result = self.check_logical_expression_req(nested_expression, reqs_being_checked=reqs_being_checked)
-        subexpression_results.append(result)
-        assert tokens.pop() == ")"
-      else:
-        # Subexpression.
-        assert prev_token in [None, "&", "|"], f"Invalid expression: {logical_expression}"
-        result = self.check_requirement_met(token, reqs_being_checked=reqs_being_checked)
-        subexpression_results.append(result)
-      prev_token = token
-    
-    if expression_type == "OR":
-      return any(subexpression_results)
-    else:
-      return all(subexpression_results)
+  def check_macro_met(self, macro: str) -> bool:
+    return self.macros[macro].eval(self)
+
+  def check_requirement_met(self, req: LogicRequirement):
+    return req.eval(self)
   
   def check_location_accessible(self, location_name):
-    requirement_expression = self.item_locations[location_name]["Need"]
-    return self.check_logical_expression_req(requirement_expression)
+    return self.item_locations[location_name]["Need"].eval(self)
   
-  def get_item_names_by_req_name(self, req_name: str):
-    items_needed = self.get_items_needed_by_req_name(req_name)
+  def get_item_names_by_req(self, req: LogicRequirement):
+    items_needed = self.get_items_needed_by_req(req)
     return self.flatten_items_needed_to_item_names(items_needed)
+
+  def get_item_names_for_location(self, location_name: str):
+    return self.get_item_names_by_req(self.item_locations[location_name]["Need"])
   
-  def get_item_names_from_logical_expression_req(self, logical_expression):
-    items_needed = self.get_items_needed_from_logical_expression_req(logical_expression)
-    return self.flatten_items_needed_to_item_names(items_needed)
-  
-  def flatten_items_needed_to_item_names(self, items_needed):
+  def flatten_items_needed_to_item_names(self, items_needed: Mapping[str, int]):
     item_names = []
     for item_name, num_required in items_needed.items():
       item_names += [item_name]*num_required
     return item_names
-  
-  def get_items_needed_by_req_name(self, req_name: str, reqs_being_checked=None):
-    if req_name in self.items_needed_cache:
-      return self.items_needed_cache[req_name]
-  
-    items_needed = {}
-    
-    # Prevent infinite recursion for cases where nested requirements depend on themselves.
-    # (e.g. temporarily_make_entrance_macros_worst_case_scenario)
-    if reqs_being_checked is None:
-      reqs_being_checked = set()
-    if req_name in self.nested_entrance_macros and self.nested_entrance_macros[req_name] in reqs_being_checked:
-      # If the logic says that, for example, TotG's dungeon entrance relies on TotG's boss entrance,
-      # we know this can't ever actually happen ingame as it would be an infinite loop.
-      # Thus we can safely just ignore this particular subtree in our search, as it is irrelevant.
-      return items_needed
-    # print(f"{' '*len(reqs_being_checked)}{req_name}")
-    assert req_name not in reqs_being_checked, f"Recursive requirement check on non-whitelisted macro: {req_name!r}"
-    reqs_being_checked.add(req_name)
-    
-    if req_name.startswith("Progressive "):
-      match = re.search(r"^(Progressive .+) x(\d+)$", req_name)
-      item_name = match.group(1)
-      num_required = int(match.group(2))
-      items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-    elif " Small Key x" in req_name:
-      match = re.search(r"^(.+ Small Key) x(\d+)$", req_name)
-      small_key_name = match.group(1)
-      num_keys_required = int(match.group(2))
-      items_needed[small_key_name] = max(num_keys_required, items_needed.setdefault(small_key_name, 0))
-    elif req_name.startswith("Can Access Item Location \""):
-      match = re.search(r"^Can Access Item Location \"([^\"]+)\"$", req_name)
-      item_location_name = match.group(1)
-      requirement_expression = self.item_locations[item_location_name]["Need"]
-      sub_items_needed = self.get_items_needed_from_logical_expression_req(requirement_expression, reqs_being_checked=reqs_being_checked)
-      for item_name, num_required in sub_items_needed.items():
-        items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-    elif req_name.startswith("Option \""):
-      pass
-    elif req_name in self.all_cleaned_item_names:
-      items_needed[req_name] = max(1, items_needed.setdefault(req_name, 0))
-    elif req_name in self.macros:
-      logical_expression = self.macros[req_name]
-      sub_items_needed = self.get_items_needed_from_logical_expression_req(logical_expression, reqs_being_checked=reqs_being_checked)
-      for item_name, num_required in sub_items_needed.items():
-        items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-    elif req_name == "Nothing":
-      pass
-    elif req_name == "Impossible":
-      pass
-    else:
-      raise Exception("Unknown requirement name: " + req_name)
-    
-    reqs_being_checked.remove(req_name)
-    
-    self.items_needed_cache[req_name] = items_needed
+
+  def get_items_needed_by_req(self, req: LogicRequirement) -> dict[str, int]:
+    items_needed: dict[str, int] = {}
+    subtree_reqs = recursive_children(req, macro_library=self.macros, ignore_cycles=True)
+    for exp in subtree_reqs:
+      if isinstance(exp, ItemReq):
+        items_needed[exp.item] = max(items_needed.get(exp.item,0), exp.num)
+      
     return items_needed
-  
-  def get_items_needed_from_logical_expression_req(self, logical_expression, reqs_being_checked=None):
-    if self.check_logical_expression_req(logical_expression):
-      # If this expression is already satisfied, we don't want to include any other items in the OR statement.
-      return {}
-    
-    items_needed = {}
-    tokens = logical_expression.copy()
-    tokens.reverse()
-    prev_token = None
-    while tokens:
-      token = tokens.pop()
-      if token == "|":
-        pass
-      elif token == "&":
-        pass
-      elif token == "(":
-        assert prev_token in [None, "&", "|"], f"Invalid expression: {logical_expression}"
-        nested_expression = tokens.pop()
-        sub_items_needed = self.get_items_needed_from_logical_expression_req(nested_expression, reqs_being_checked=reqs_being_checked)
-        for item_name, num_required in sub_items_needed.items():
-          items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-        assert tokens.pop() == ")"
-      else:
-        # Subexpression.
-        assert prev_token in [None, "&", "|"], f"Invalid expression: {logical_expression}"
-        sub_items_needed = self.get_items_needed_by_req_name(token, reqs_being_checked=reqs_being_checked)
-        for item_name, num_required in sub_items_needed.items():
-          items_needed[item_name] = max(num_required, items_needed.setdefault(item_name, 0))
-      prev_token = token
-    
-    return items_needed
-  
-  def check_progressive_item_req(self, req_name: str):
-    match = re.search(r"^(Progressive .+) x(\d+)$", req_name)
-    assert match
-    item_name = match.group(1)
-    num_required = int(match.group(2))
-    
-    num_owned = self.currently_owned_items.count(item_name)
-    return num_owned >= num_required
-  
-  def check_small_key_req(self, req_name: str):
-    match = re.search(r"^(.+ Small Key) x(\d+)$", req_name)
-    assert match
-    small_key_name = match.group(1)
-    num_keys_required = int(match.group(2))
-    
-    num_small_keys_owned = self.currently_owned_items.count(small_key_name)
-    return num_small_keys_owned >= num_keys_required
-  
-  def check_item_location_requirement(self, req_name: str):
-    match = re.search(r"^Can Access Item Location \"([^\"]+)\"$", req_name)
-    assert match
-    item_location_name = match.group(1)
-    
-    return self.check_location_accessible(item_location_name)
-  
-  def check_option_enabled_requirement(self, req_name: str):
-    positive_boolean_match = re.search(r"^Option \"([^\"]+)\" Enabled$", req_name)
-    negative_boolean_match = re.search(r"^Option \"([^\"]+)\" Disabled$", req_name)
-    positive_dropdown_match = re.search(r"^Option \"([^\"]+)\" Is \"([^\"]+)\"$", req_name)
-    negative_dropdown_match = re.search(r"^Option \"([^\"]+)\" Is Not \"([^\"]+)\"$", req_name)
-    positive_list_match = re.search(r"^Option \"([^\"]+)\" Contains \"([^\"]+)\"$", req_name)
-    negative_list_match = re.search(r"^Option \"([^\"]+)\" Does Not Contain \"([^\"]+)\"$", req_name)
-    if positive_boolean_match:
-      option_name = positive_boolean_match.group(1)
-      return not not self.options[option_name]
-    elif negative_boolean_match:
-      option_name = negative_boolean_match.group(1)
-      return not self.options[option_name]
-    elif positive_dropdown_match:
-      option_name = positive_dropdown_match.group(1)
-      value = positive_dropdown_match.group(2)
-      return self.options[option_name] == value
-    elif negative_dropdown_match:
-      option_name = negative_dropdown_match.group(1)
-      value = negative_dropdown_match.group(2)
-      return self.options[option_name] != value
-    elif positive_list_match:
-      option_name = positive_list_match.group(1)
-      value = positive_list_match.group(2)
-      return value in self.options[option_name]
-    elif negative_list_match:
-      option_name = negative_list_match.group(1)
-      value = negative_list_match.group(2)
-      return value not in self.options[option_name]
-    else:
-      raise Exception("Invalid option check requirement: %s" % req_name)
   
   def chart_name_for_location(self, location_name):
-    reqs = self.item_locations[location_name]["Need"]
-    chart_req = next(req for req in reqs if req.startswith("Chart for Island "))
-    
-    reqs = self.macros[chart_req]
-    chart_name = reqs[0]
-    assert chart_name in self.all_cleaned_item_names
-    
-    return chart_name
-  
+    reqs = self.get_items_needed_by_req(self.item_locations[location_name]["Need"])
+    chart_name = [item_name for item_name in reqs if " Chart " in item_name]
+    assert len(chart_name) == 1
+    assert chart_name[0] in self.all_cleaned_item_names
+    return chart_name[0]
   
   @staticmethod
   def load_and_parse_enemy_locations() -> dict[str, list[dict]]:
@@ -1180,9 +915,9 @@ class Logic:
       # All the enemies we need to check have already been checked and cached. Return early to improve performance.
       return enemy_datas_allowed_here
     
-    orig_req_expression = Logic.parse_logic_expression(original_req_string)
+    orig_req= parse_logic_expression(original_req_string, known_macros=self.macros).optimize_for_current_state(self)
     
-    max_num_of_each_item_to_check = self.get_items_needed_from_logical_expression_req(orig_req_expression)
+    max_num_of_each_item_to_check = self.get_items_needed_by_req(orig_req)
     
     # Remove starting items from being checked.
     for item_name in self.currently_owned_items:
@@ -1213,7 +948,7 @@ class Logic:
     # print(f"Biggest item combo length: {len(biggest_combo)} items")
     # print(f"Biggest item combo: {biggest_combo}")
     
-    item_combos_to_check, checked_combos = self.get_all_item_combo_subsets_meeting_req(biggest_combo, orig_req_expression)
+    item_combos_to_check, checked_combos = self.get_all_item_combo_subsets_meeting_req(biggest_combo, orig_req)
     
     # print(f"Actually checking {len(item_combos_to_check)} combos")
     # print(f"Actually checking {len(item_combos_to_check)} combos (lengths: {', '.join(str(len(combo)) for combo in sorted(item_combos_to_check)[:30])})")
@@ -1247,8 +982,8 @@ class Logic:
             # Allow enemies that can be killed by bombs in rooms with bomb flowers even if the player doesn't own the bombs upgrade.
             continue
           
-          possible_new_enemy_req_expression = Logic.parse_logic_expression(possible_new_enemy_data["Requirements to defeat"])
-          new_req_met = self.check_logical_expression_req(possible_new_enemy_req_expression)
+          possible_new_enemy_req = parse_logic_expression(possible_new_enemy_data["Requirements to defeat"], known_macros=self.macros).optimize_for_current_state(self)
+          new_req_met = self.check_requirement_met(possible_new_enemy_req)
           if not new_req_met:
             enemy_datas_allowed_here.remove(possible_new_enemy_data)
             self.cached_enemies_tested_for_reqs_tuple[reqs_tuple_key][enemy_name] = False
@@ -1259,7 +994,7 @@ class Logic:
     
     return enemy_datas_allowed_here
   
-  def get_all_item_combo_subsets_meeting_req(self, item_combo: tuple, orig_req_expression: list) -> tuple[set, set]:
+  def get_all_item_combo_subsets_meeting_req(self, item_combo: tuple, orig_req: LogicRequirement) -> tuple[set, set]:
     # This function returns all subsets of an item combo that meet a particular requirement.
     # e.g. If the requirement is 'Hookshot', and the initial combo is ('Hookshot', 'Deku Leaf'),
     # then this function would return {('Hookshot', 'Deku Leaf'), ('Hookshot')} as both of those
@@ -1274,23 +1009,23 @@ class Logic:
     matched_combos = set()
     checked_combos = set()
     self.get_all_item_combo_subsets_meeting_req_recursive(
-      item_combo, orig_req_expression,
+      item_combo, orig_req,
       matched_combos, checked_combos,
     )
     return matched_combos, checked_combos
   
-  def get_all_item_combo_subsets_meeting_req_recursive(self, item_combo: tuple, orig_req_expression: list, matched_combos: set, checked_combos: set):
+  def get_all_item_combo_subsets_meeting_req_recursive(self, item_combo: tuple, orig_req: LogicRequirement, matched_combos: set, checked_combos: set):
     if item_combo in checked_combos:
       return
     
     with self.add_temporary_items(item_combo):
-      orig_req_met = self.check_logical_expression_req(orig_req_expression)
+      orig_req_met = self.check_requirement_met(orig_req)
     
     checked_combos.add(item_combo)
     # if len(checked_combos) > 1000 and len(checked_combos) % 10000 == 0:
     #   print(f"Did a preliminary check on {len(checked_combos)} combos so far...")
     if len(checked_combos) >= 10000:
-      raise Exception(f"Enemy randomizer got stuck in an exponential loop checking over {len(checked_combos)} possibilities for requirement: {orig_req_expression!r}")
+      raise Exception(f"Enemy randomizer got stuck in an exponential loop checking over {len(checked_combos)} possibilities for requirement: {orig_req!r}")
     
     if not orig_req_met:
       return
@@ -1306,6 +1041,23 @@ class Logic:
       subset_item_combo.remove(item)
       subset_item_combo = tuple(subset_item_combo)
       self.get_all_item_combo_subsets_meeting_req_recursive(
-        subset_item_combo, orig_req_expression,
+        subset_item_combo, orig_req,
         matched_combos, checked_combos,
       )
+
+  def compile_macros(self, macros: dict[str, LogicRequirement]):
+    self.macros = {}
+    self.macros = {name: macros[name].specialize_for_seed(self) for name in self.mutable_macros}
+
+    undone_macros = set(macros.keys())
+    new_terminals = self.mutable_macros.copy()
+    while new_terminals:
+      undone_macros -= new_terminals
+      new_terminals = set()
+      for name in undone_macros:
+        macros[name] = macros[name].specialize_for_seed(self)
+        if expr_is_terminal(macros[name], terminal_macros=self.macros, macro_library=macros):
+          new_terminals.add(name)
+          self.macros[name] = macros[name]
+    if undone_macros:
+      raise Exception(f"Unable to reduce all macros. Remaining: {undone_macros}")

@@ -335,7 +335,7 @@ class ItemRandomizer(BaseRandomizer):
         dungeon_item_name = self.logic.prerandomization_item_locations[location_name]
         self.logic.set_location_to_item(location_name, dungeon_item_name)
     
-    game_beatable = self.logic.check_requirement_met("Can Reach and Defeat Ganondorf")
+    game_beatable = self.logic.check_requirement_met(self.logic.COMPLETE_GAME_REQ)
     if not game_beatable:
       raise Exception("Game is not beatable on this seed! This error shouldn't happen.")
   
@@ -681,7 +681,7 @@ class ItemRandomizer(BaseRandomizer):
           progress_items_in_this_sphere[location_name] = item_name
       
       if not game_beatable and not added_any_reqbosses_this_sphere:
-        game_beatable = logic.check_requirement_met("Can Reach and Defeat Ganondorf")
+        game_beatable = logic.check_requirement_met(logic.COMPLETE_GAME_REQ)
         if game_beatable:
           progress_items_in_this_sphere["Ganon's Tower - Rooftop"] = "Defeat Ganondorf"
       
@@ -696,7 +696,7 @@ class ItemRandomizer(BaseRandomizer):
     
     if not game_beatable:
       # If the game wasn't already beatable on a previous progression sphere but it is now we add one final one just for this.
-      game_beatable = logic.check_requirement_met("Can Reach and Defeat Ganondorf")
+      game_beatable = logic.check_requirement_met(logic.COMPLETE_GAME_REQ)
       if game_beatable:
         final_progression_sphere = {"Ganon's Tower - Rooftop": "Defeat Ganondorf"}
         progression_spheres.append(final_progression_sphere)
