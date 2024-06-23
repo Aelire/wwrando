@@ -494,13 +494,7 @@ class EntranceRandomizer(BaseRandomizer):
   def check_if_one_exit_is_progress(self, exit: ZoneExit) -> bool:
     locs_for_exit = self.zone_exit_to_logically_dependent_item_locations[exit]
     assert locs_for_exit, f"Could not find any item locations corresponding to zone exit: {exit.unique_name}"
-    # Banned required bosses mode dungeons still technically count as progress locations, so
-    # filter them out separately first.
-    nonbanned_locs = [
-      loc for loc in locs_for_exit
-      if loc not in self.rando.boss_reqs.banned_locations
-    ]
-    progress_locs = self.logic.filter_locations_for_progression(nonbanned_locs)
+    progress_locs = self.logic.filter_locations_for_progression(locs_for_exit)
     return bool(progress_locs)
 
   def split_nonprogress_entrances_and_exits(self, relevant_entrances: list[ZoneEntrance], relevant_exits: list[ZoneExit]):

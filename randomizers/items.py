@@ -61,7 +61,7 @@ class ItemRandomizer(BaseRandomizer):
   def write_to_non_spoiler_log(self) -> str:
     log_str = ""
     
-    progress_locations, nonprogress_locations = self.logic.get_progress_and_non_progress_locations()
+    progress_locations, nonprogress_locations = self.logic.get_locations_included_and_excluded_by_settings()
     
     log_str += "### Locations that may or may not have progress items in them on this run:\n"
     log_str += self.write_list_of_location_names_to_log(progress_locations)
