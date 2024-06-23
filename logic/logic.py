@@ -1382,7 +1382,9 @@ class Logic:
         key_stack.enter_context(self.add_temporary_items([dungeon_key_name]))
         unknown_keys -= 1
         guaranteed_keys += 1
+        print(f"Inaccessible locs in {dungeon}: {inaccessible_locs}")
         new_accessible_locs = [loc for loc in inaccessible_locs if self.check_location_accessible(loc)]
+        print(f"Guaranteed accessible by key logic: {new_accessible_locs}")
         accessible_locs += new_accessible_locs
     
     return accessible_locs, guaranteed_keys

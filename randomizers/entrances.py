@@ -633,6 +633,7 @@ class EntranceRandomizer(BaseRandomizer):
       remaining_exits.remove(zone_exit)
       
       self.entrance_connections[zone_entrance.entrance_name] = zone_exit.unique_name
+      print(f"{zone_entrance.entrance_name} -> {zone_exit.unique_name}")
       self.done_entrances_to_exits[zone_entrance] = zone_exit
       self.done_exits_to_entrances[zone_exit] = zone_entrance
       
@@ -647,6 +648,7 @@ class EntranceRandomizer(BaseRandomizer):
     unplaced_nondungeon_items = [it for it in self.logic.unplaced_progress_items if not self.logic.is_dungeon_item(it)]
     self.logic.temporarily_make_entrance_macros_worst_case_scenario()
     min_initial_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+    print(f"Need {min_initial_progress_items} progress items in safety entrance")
     accessible_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
     if len(accessible_locations) > min_initial_progress_items:
       # There are initially accessible locations, either in the overworld, in a nonrandomized entrance, 
@@ -679,6 +681,7 @@ class EntranceRandomizer(BaseRandomizer):
       raise Exception("No accessible entrance at the start of the game")
     
     self.safety_entrance = self.rng.choice(accessible_entrances)
+    print(f"Safety Entrance: {self.safety_entrance}")
     
     # Then we get a list of exits that have progression locations accessible from the start, assuming you 
     # can get to the location. This needs to be calculated now rather than at assignment time since
@@ -700,6 +703,9 @@ class EntranceRandomizer(BaseRandomizer):
           dungeon_key_name = self.logic.DUNGEON_NAME_TO_SHORT_DUNGEON_NAME[ex.unique_name] + " Small Key"
           with self.logic.add_temporary_items([dungeon_key_name] * given_keys):
             min_initial_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+            print(f"Need {min_initial_progress_items} progress items for {ex.unique_name} as safety exit")
+            print(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True))
+            print(f"{ex.unique_name} initial accessible: {accessible_progress_locs}")
             if len(accessible_progress_locs) >= given_keys + min_initial_progress_items:
               # There will be non-key accessible locations, and the item randomizer will assign failsafe locations if necessary, this dungeon is usable
               self.initially_accessible_exits.add(ex)
@@ -710,6 +716,7 @@ class EntranceRandomizer(BaseRandomizer):
           self.initially_accessible_exits.add(ex)
           continue
       
+    print(f"Possible Safety Exits: {self.initially_accessible_exits}")
     self.logic.update_entrance_connection_macros()
   
   def finalize_all_randomized_sets_of_entrances(self):

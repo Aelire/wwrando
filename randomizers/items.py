@@ -100,6 +100,8 @@ class ItemRandomizer(BaseRandomizer):
     
     self.dungeon_failsafe_locations: list[str] = []
     min_progress_items = min(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True).values())
+    print(self.logic.get_items_by_usefulness_fraction(unplaced_nondungeon_items, filter_sunken_treasure=True))
+    print(f"Min usefulness: {min_progress_items}")
     if self.need_failsafe_dungeon_loc(min_progress_items):
       progress_dungeons = self.rando.boss_reqs.required_dungeons.copy() if self.options.required_bosses else list(self.logic.DUNGEON_NAMES.values())
       self.rng.shuffle(progress_dungeons)
@@ -111,19 +113,25 @@ class ItemRandomizer(BaseRandomizer):
         while not initially_accessible_locs:
           failsafe_dungeon = next(progress_dungeons)
           initially_accessible_locs, given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(failsafe_dungeon)
+          print(f"Guaranteed keys in {failsafe_dungeon}: {given_keys}")
           assert len(initially_accessible_locs) >= given_keys
           initially_accessible_locs = [loc for loc in initially_accessible_locs if loc not in self.dungeon_failsafe_locations]
+        print(f"Putting some failsafe locs in {failsafe_dungeon} ({given_keys} guaranteed keys)")
         
+        print(f"Accessible locs in dungeon: {initially_accessible_locs}")
         assert failsafe_dungeon # type hint
         if failsafe_dungeon in visited_dungeons:
           # Key locs already taken into account
           self.dungeon_failsafe_locations.append(self.rng.choice(initially_accessible_locs))
+          print(f"Failsafe locs added: {self.dungeon_failsafe_locations[-1]}")
         else:
           # Need to reserve given_keys locations + a progress location
           self.rng.shuffle(initially_accessible_locs)
           self.dungeon_failsafe_locations += initially_accessible_locs[:given_keys + 1]
+          print(f"Failsafe locs added: {initially_accessible_locs[:given_keys + 1]}")
           self.max_dungeon_failsafe_keys[failsafe_dungeon] = given_keys
           visited_dungeons.add(failsafe_dungeon)
+    print(f"Failsafe dungeon locations: {self.dungeon_failsafe_locations}")
 
     # Temporarily add all items except for dungeon keys while we randomize them.
     for item_name in unplaced_nondungeon_items:
@@ -172,30 +180,38 @@ class ItemRandomizer(BaseRandomizer):
     
     # Reset the dungeon entrance macros.
     self.logic.update_entrance_connection_macros()
+    print(self.logic.prerandomization_item_locations)
   
   def need_failsafe_dungeon_loc(self, min_progress_items: int = 1) -> bool:
     # At this stage, entrances and extra starting items have been completely assigned,
     # so we can check whether the actual start conditions result in a dungeon-only start
     initially_accessible_locations = self.logic.get_accessible_remaining_locations(for_progression=True)
+    print(initially_accessible_locations)
     progress_dungeons = self.rando.boss_reqs.required_dungeons if self.options.required_bosses else list(self.logic.DUNGEON_NAMES.values())
     if not all(self.logic.is_dungeon_location(loc) for loc in initially_accessible_locations):
+      print("Non-dungeon progression locs, no failsafe")
       return False
     
     # All progression locations are in dungeons, so this is a dungeon-only start (and dungeons are progression)
     # Check if we need to tweak some dungeon item logic to guarantee a progression location in one of the dungeons
     required_dungeon_locs = self.logic.get_max_dungeon_item_locations()
+    print(f"Progression dungeons: {progress_dungeons}")
     for dungeon in progress_dungeons:
       accessible_locs_in_dungeon = [
         loc for loc in initially_accessible_locations
         if self.logic.is_dungeon_location(loc, dungeon_name_to_match=dungeon)
       ]
+      print(f"{dungeon}: {accessible_locs_in_dungeon}")
       if len(accessible_locs_in_dungeon) >= required_dungeon_locs[dungeon] + min_progress_items:
         # Easy case, no matter where the keys end up we have a location
+        print(f"Enough progress locations in {dungeon} with worst-case key scenario, no failsafe")
         return False
       accessible_locs_in_dungeon, _given_keys = self.logic.get_all_accessible_locs_in_dungeon_with_key_logic(dungeon)
       if len(accessible_locs_in_dungeon) >= required_dungeon_locs[dungeon] + min_progress_items:
+        print(f"Enough progress locations in {dungeon} with guaranteed keys, no failsafe")
         return False
     
+    print("Assigning failsafe locations")
     return True
   
   def place_dungeon_item(self, item_name):
@@ -318,6 +334,7 @@ class ItemRandomizer(BaseRandomizer):
           unique_possible_items.append(item_name)
       possible_items = unique_possible_items
       
+      print(f"Accessible undone locations: {accessible_undone_locations}")
       must_place_useful_item = False
       should_place_useful_item = True
       if len(accessible_undone_locations) == 1 and len(possible_items) > 1:
@@ -338,6 +355,7 @@ class ItemRandomizer(BaseRandomizer):
             possible_items,
             filter_sunken_treasure=not (self.options.progression_triforce_charts or self.options.progression_treasure_charts),
           )
+          print(f"Usefulnesses: {item_by_usefulness_fraction}")
           if must_place_useful_item:
             raise Exception("No useful progress items to place!")
           else:
@@ -383,7 +401,9 @@ class ItemRandomizer(BaseRandomizer):
         possible_locations_with_weighting += [location_name]*weight
       
       location_name = self.rng.choice(possible_locations_with_weighting)
+      print(f"{location_name} -> {item_name}")
       self.logic.set_location_to_item(location_name, item_name)
+      print(f"Newly Accessible: {set(self.logic.get_accessible_remaining_locations(for_progression=True)) - set(accessible_undone_locations)}")
     
     # Make sure locations that should have predetermined items in them have them properly placed, even if the above logic missed them for some reason.
     for location_name in self.logic.prerandomization_item_locations:
