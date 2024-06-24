@@ -7,15 +7,11 @@ if TYPE_CHECKING:
   from randomizer import WWRandomizer
 
 import copy
-import os
 from contextlib import contextmanager
-
-from ruamel.yaml import YAML
-yaml = YAML(typ="safe")
 
 from logic.expressions.graph_ops import recursive_children, expr_is_terminal
 from logic.expressions.requirement import And, Impossible, ItemReq, LogicRequirement, MacroReq, Nothing, OtherLocationReq
-from logic.expressions.parser import load_and_parse_item_locations, load_and_parse_macros, parse_logic_expression
+from logic.expressions.parser import load_and_parse_item_locations, load_and_parse_macros
 from logic.item_types import PROGRESS_ITEMS, NONPROGRESS_ITEMS, CONSUMABLE_ITEMS, DUPLICATABLE_CONSUMABLE_ITEMS, DUNGEON_PROGRESS_ITEMS, DUNGEON_NONPROGRESS_ITEMS
 from wwrando_paths import LOGIC_PATH
 from randomizers import entrances
@@ -870,14 +866,7 @@ class Logic:
     assert chart_name[0] in self.all_cleaned_item_names
     return chart_name[0]
   
-  @staticmethod
-  def load_and_parse_enemy_locations() -> dict[str, list[dict]]:
-    with open(os.path.join(LOGIC_PATH, "enemy_locations.txt")) as f:
-      enemy_locations = yaml.load(f)
-    
-    return enemy_locations
-  
-  def filter_out_enemies_that_add_new_requirements(self, original_req_string, has_throwable_objects, has_bomb_flowers, possible_new_enemy_datas):
+  def filter_out_enemies_that_add_new_requirements(self, original_req: LogicRequirement, has_throwable_objects: bool, has_bomb_flowers: bool, possible_new_enemy_datas):
     # This function takes a list of enemy types and removes the ones that would add new required items for a room.
     # This is because the enemy randomizer cannot increase the logic requirements compared to when enemies are not randomized, it can only keep them the same or decrease them.
     
@@ -897,7 +886,7 @@ class Logic:
     possible_new_enemy_datas_to_check = possible_new_enemy_datas.copy()
     
     # This tuple is the key we'll use into the cache to identify this set of requirement arguments.
-    reqs_tuple_key = (original_req_string, has_throwable_objects, has_bomb_flowers)
+    reqs_tuple_key = (original_req, has_throwable_objects, has_bomb_flowers)
     
     # However, we don't recheck ones that are already in the cache.
     if reqs_tuple_key not in self.cached_enemies_tested_for_reqs_tuple:
@@ -915,9 +904,7 @@ class Logic:
       # All the enemies we need to check have already been checked and cached. Return early to improve performance.
       return enemy_datas_allowed_here
     
-    orig_req= parse_logic_expression(original_req_string, known_macros=self.macros).optimize_for_current_state(self)
-    
-    max_num_of_each_item_to_check = self.get_items_needed_by_req(orig_req)
+    max_num_of_each_item_to_check = self.get_items_needed_by_req(original_req)
     
     # Remove starting items from being checked.
     for item_name in self.currently_owned_items:
@@ -948,7 +935,7 @@ class Logic:
     # print(f"Biggest item combo length: {len(biggest_combo)} items")
     # print(f"Biggest item combo: {biggest_combo}")
     
-    item_combos_to_check, checked_combos = self.get_all_item_combo_subsets_meeting_req(biggest_combo, orig_req)
+    item_combos_to_check, checked_combos = self.get_all_item_combo_subsets_meeting_req(biggest_combo, original_req)
     
     # print(f"Actually checking {len(item_combos_to_check)} combos")
     # print(f"Actually checking {len(item_combos_to_check)} combos (lengths: {', '.join(str(len(combo)) for combo in sorted(item_combos_to_check)[:30])})")
@@ -982,7 +969,7 @@ class Logic:
             # Allow enemies that can be killed by bombs in rooms with bomb flowers even if the player doesn't own the bombs upgrade.
             continue
           
-          possible_new_enemy_req = parse_logic_expression(possible_new_enemy_data["Requirements to defeat"], known_macros=self.macros).optimize_for_current_state(self)
+          possible_new_enemy_req = possible_new_enemy_data["Requirements to defeat"]
           new_req_met = self.check_requirement_met(possible_new_enemy_req)
           if not new_req_met:
             enemy_datas_allowed_here.remove(possible_new_enemy_data)

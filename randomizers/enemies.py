@@ -9,7 +9,7 @@ yaml = YAML(typ="safe")
 
 from randomizers.base_randomizer import BaseRandomizer
 from wwlib import stage_searcher
-from logic.logic import Logic
+from logic.expressions.parser import load_and_parse_enemy_locations, parse_logic_expression
 from wwlib.dzx import DZx, ACTR, DOOR, FILI, RPAT, SCOB, STAG, TGDR, DZxLayer
 from wwrando_paths import DATA_PATH
 
@@ -149,7 +149,15 @@ class EnemyRandomizer(BaseRandomizer):
     with open(os.path.join(DATA_PATH, "enemy_types.txt"), "r") as f:
       self.enemy_types = yaml.load(f)
     
-    self.enemy_locations = Logic.load_and_parse_enemy_locations()
+    for enemy in self.enemy_types:
+      enemy["Requirements to defeat"] = parse_logic_expression(enemy["Requirements to defeat"], known_macros=self.logic.macros).specialize_for_seed(self.logic)
+      
+    self.enemy_locations = load_and_parse_enemy_locations(known_macros=self.logic.macros)
+    for name, area in self.enemy_locations.items():
+      for idx, group in enumerate(area):
+        req = group["Original requirements"]
+        self.enemy_locations[name][idx]["Original requirements"] = req.specialize_for_seed(self.logic)
+
     
     # We must compile the human-written placement categories each enemy type is allowed in to account
     # for extra category limitations (like locations where the enemy is required to set a switch on

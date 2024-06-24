@@ -1,6 +1,7 @@
 from collections.abc import Collection, Iterator
 import os
 import re
+from typing import Any
 
 from ruamel.yaml import YAML
 yaml = YAML(typ="safe")
@@ -40,7 +41,17 @@ def load_and_parse_macros() -> dict[str, LogicRequirement]:
   }
   
   return macros
-
+  
+def load_and_parse_enemy_locations(known_macros: Collection[str]) -> dict[str, list[dict[str, Any]]]:
+  with open(os.path.join(LOGIC_PATH, "enemy_locations.txt")) as f:
+    enemy_locations = yaml.load(f)
+  
+  for name, area in enemy_locations.items():
+    for group in area:
+      group["Original requirements"] = parse_logic_expression(group["Original requirements"], known_macros=known_macros)
+  
+  return enemy_locations
+  
 def parse_logic_expression(string: str, *, known_macros: Collection[str]) -> LogicRequirement:
   tokens = filter(None, (substring.strip() for substring in re.split("([&|()])", string)))
   try:
