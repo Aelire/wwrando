@@ -137,8 +137,14 @@ def run_all_bulk_tests(rando_kwargs, num_seeds):
   # Catch any init errors early
   WWRandomizer(**rando_kwargs)
   
+  first_seed = 0
+  if args.profile:
+    # Avoid polluting the profile with multiprocessing synchronization
+    for i in range(first_seed, first_seed+num_seeds):
+      run_single_bulk_test((i, rando_kwargs))
+    return
+
   with Pool() as p:
-    first_seed = 0
     func_args = [(i, rando_kwargs) for i in range(first_seed, first_seed+num_seeds)]
     progress_bar = tqdm(p.imap(run_single_bulk_test, func_args), total=num_seeds)
     
