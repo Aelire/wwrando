@@ -113,13 +113,13 @@ def parse_stream(stream: Iterator[str], *, known_macros: Collection[str]) -> Log
 def parse_item_req(item_req: str) -> ItemReq:
   # Helper to parse the various ways of specifying item requirements
   if item_req.startswith("Progressive "):
-    match = re.search(r"^(Progressive .+) x(\d+)$", item_req)
+    match = re.search(r"^(Progressive .+?)(?: x(\d+))?$", item_req)
     assert match, f"Error parsing progressive item requirement: {item_req}"
-    return ItemReq(match.group(1), int(match.group(2)))
+    return ItemReq(match.group(1), int(match.group(2) or 1))
   if " Small Key x" in item_req:
-    match = re.search(r"^(.+ Small Key) x(\d+)$", item_req)
+    match = re.search(r"^(.+ Small Key)(?: x(\d+))?$", item_req)
     assert match, f"Error parsing key requirement: {item_req}"
-    return ItemReq(match.group(1), int(match.group(2)))
+    return ItemReq(match.group(1), int(match.group(2) or 1))
   else:
     assert item_req in ALL_UNIQUE_ITEMS, f"{item_req} is not a known progress item"
   

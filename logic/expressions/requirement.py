@@ -69,6 +69,13 @@ class Or(BooleanCombinator):
         continue
       elif isinstance(simplified, Or):
         reduced |= simplified.exps
+      elif isinstance(simplified, ItemReq):
+        # Min quantity
+        if equiv := next((e for e in reduced if isinstance(e, ItemReq) and e.item == simplified.item), None):
+          reduced.remove(equiv)
+          reduced.add(ItemReq(simplified.item, min(equiv.num, simplified.num)))
+        else:
+          reduced.add(simplified)
       elif isinstance(simplified, LogicRequirement):
         reduced.add(simplified)
       else:
@@ -105,6 +112,13 @@ class And(BooleanCombinator):
         continue
       elif isinstance(simplified, And):
         reduced |= simplified.exps
+      elif isinstance(simplified, ItemReq) and simplified.num > 1:
+        # Max quantity
+        if equiv := next((e for e in reduced if isinstance(e, ItemReq) and e.item == simplified.item), None):
+          reduced.remove(equiv)
+          reduced.add(ItemReq(simplified.item, max(equiv.num, simplified.num)))
+        else:
+          reduced.add(simplified)
       elif isinstance(simplified, LogicRequirement):
         reduced.add(simplified)
       else:
