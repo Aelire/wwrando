@@ -152,7 +152,10 @@ class ItemRandomizer(BaseRandomizer):
     self.logic.update_entrance_connection_macros()
 
   def place_dungeon_item(self, item_name):
-    if self.options.progression_dungeons:
+    dungeon_name = self.logic.DUNGEON_NAMES[item_name.split(" ")[0]]
+    if self.options.progression_dungeons and (
+      not self.options.required_bosses or dungeon_name in self.rando.boss_reqs.required_dungeons
+    ):
       # If dungeons themselves are progress, do not allow dungeon items to appear in any dungeon
       # locations that are nonprogress (e.g. Tingle Chests).
       for_progression = True

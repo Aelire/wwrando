@@ -1,5 +1,6 @@
 from collections import Counter
 
+from logic.item_types import DUNGEON_PROGRESS_ITEMS
 from randomizers.base_randomizer import BaseRandomizer
 from gclib import fs_helpers as fs
 from wwlib.dzx import DZx, ACTR, TGOB, SCOB
@@ -115,6 +116,19 @@ class RequiredBossesRandomizer(BaseRandomizer):
         self.banned_locations.append(location_name)
       elif location_name == "Mailbox - Letter from Tingle" and "Forsaken Fortress" in self.banned_dungeons:
         self.banned_locations.append(location_name)
+    
+    dungeon_items_to_make_nonprogress = []
+    for item_name in self.logic.unplaced_progress_items:
+      # Make banned dungeon items nonprogress
+      if item_name not in DUNGEON_PROGRESS_ITEMS:
+        continue
+      if self.logic.DUNGEON_NAMES[item_name.split(" ")[0]] in self.banned_dungeons:
+        dungeon_items_to_make_nonprogress.append(item_name)
+    for item_name in dungeon_items_to_make_nonprogress:
+      self.logic.unplaced_progress_items.remove(item_name)
+      self.logic.all_progress_items.remove(item_name)
+      self.logic.unplaced_nonprogress_items.append(item_name)
+      self.logic.all_nonprogress_items.append(item_name)
 
   def show_quest_markers_on_sea_chart_for_dungeons(self):
     # Uses the blue quest markers on the sea chart to highlight certain dungeons.

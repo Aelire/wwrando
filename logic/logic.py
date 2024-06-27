@@ -762,13 +762,13 @@ class Logic:
     
     progress_locations = self.get_progress_locations()
     
-    if self.rando.entrances.is_enabled():
+    if self.rando.entrances.is_enabled() and not self.rando.entrances.made_any_changes:
       # Since the randomizer hasn't decided which dungeon/secret cave will be where yet, we have to assume the worst
       # case scenario by considering that you need to be able to access all dungeon/secret cave entrances in order to
       # access each individual one.
       self.temporarily_make_entrance_macros_worst_case_scenario()
     
-    if self.rando.boss_reqs.is_enabled():
+    if self.rando.boss_reqs.is_enabled() and not self.rando.boss_reqs.made_any_changes:
       # Required bosses mode also hasn't decided on which bosses to make required, so assume the worst case here too.
       self.temporarily_make_required_bosses_macro_worst_case_scenario()
     
