@@ -1,7 +1,6 @@
-from dataclasses import dataclass
-from pprint import pprint
+from argparse import Namespace
 from logic.expressions import parser
-from logic.expressions.requirement import LogicRequirement, And, Or, ItemReq, MacroReq, OtherLocationReq, Nothing, Impossible
+from logic.expressions.requirement import LogicRequirement
 from options.wwrando_options import Options
 
 def test_parse_all():
@@ -16,8 +15,8 @@ class LogicMock:
   item_locations: dict[str, dict]
   macros: dict[str, LogicRequirement]
   mutable_macros: set[str] = set()
-  currently_owned_items = ["Progressive Sword", "Wind's Requiem", "Boat's Sail", "Wind Waker", "Ballad of Gales"]
   options: Options
+  rando = Namespace(starting_items = ["Progressive Sword", "Wind's Requiem", "Boat's Sail", "Wind Waker", "Ballad of Gales"])
 
 def test_parse_all_and_simplify():
   logic = LogicMock()
@@ -51,13 +50,14 @@ def test_logic_simplifications():
   assert equivalent("Nothing | Impossible", "Nothing")
   assert equivalent("Impossible | Impossible", "Impossible")
   assert equivalent("Nothing | Nothing", "Nothing")
-  assert equivalent(
-    "Bombs & Hookshot & (Progressive Bow x2 & Progressive Sword x1)",
-    "Bombs & Hookshot & Progressive Bow x2 & Progressive Sword", # Lenient progressive item parsing
+  assert equivalent( # distribution
+    "Bombs & Hookshot & (Progressive Bow & Progressive Sword x2)",
+    "Bombs & Hookshot & Progressive Bow & Progressive Sword x2",
   )
   assert equivalent( # Commutative
     "Bombs & Hookshot & (Progressive Bow x2 & Progressive Sword x1)",
     "Hookshot & Progressive Bow x2 & Progressive Sword x1 & Bombs",
   )
   assert equivalent("Progressive Bow x2 & Progressive Bow x1", "Progressive Bow x2")
+  assert equivalent("Progressive Bow x2 | Progressive Bow x1", "Progressive Bow x1")
   assert equivalent("DRC Small Key", "DRC Small Key x1")

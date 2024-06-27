@@ -147,6 +147,12 @@ class ItemReq(LogicRequirement):
   def eval(self, logic: "Logic") -> bool:
     return logic.currently_owned_items.count(self.item) >= self.num
 
+  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
+    if logic.rando.starting_items.count(self.item) >= self.num:
+      return Nothing
+    else:
+      return self
+
   @override
   def __str__(self) -> str:
     if self.num > 1:
