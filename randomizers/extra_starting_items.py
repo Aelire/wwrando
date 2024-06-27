@@ -102,7 +102,7 @@ class ExtraStartingItemsRandomizer(BaseRandomizer):
         available_items.add(item)
     
     available_items -= DISALLOWED_RANDOM_STARTING_ITEMS
-    if not "Delivery Bag" in self.logic.currently_owned_items:
+    if self.logic.currently_owned_items.get("Delivery Bag", 0) == 0:
       # Delivery bag is the only bag that can hold progression items, and we
       # don't want to give a progression item if we don't have its bag since
       # it's impossible to see the item until you get delivery bag in that case

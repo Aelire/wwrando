@@ -129,7 +129,7 @@ class Logic:
     self.unplaced_progress_items: list[str]
     self.unplaced_nonprogress_items: list[str]
     self.unplaced_fixed_consumable_items: list[str]
-    self.currently_owned_items: list[str] = []
+    self.currently_owned_items: dict[str, int] = {}
     
     if self.rando.fully_initialized:
       self.initialize_from_randomizer_state()
@@ -289,7 +289,7 @@ class Logic:
     if cleaned_item_name not in self.all_cleaned_item_names:
       raise Exception("Unknown item name: " + item_name)
     
-    self.currently_owned_items.append(cleaned_item_name)
+    self.currently_owned_items[cleaned_item_name] = self.currently_owned_items.get(cleaned_item_name, 0) + 1
     
     if item_name in self.unplaced_progress_items:
       self.unplaced_progress_items.remove(item_name)
@@ -303,7 +303,9 @@ class Logic:
     if cleaned_item_name not in self.all_cleaned_item_names:
       raise Exception("Unknown item name: " + item_name)
     
-    self.currently_owned_items.remove(cleaned_item_name)
+    self.currently_owned_items[cleaned_item_name] -= 1
+    if self.currently_owned_items[cleaned_item_name] == 0:
+      del self.currently_owned_items[cleaned_item_name]
     
     if self.all_progress_items.count(item_name) > self.unplaced_progress_items.count(item_name):
       self.unplaced_progress_items.append(item_name)
@@ -398,9 +400,10 @@ class Logic:
     
     for item_names_for_loc in item_names_for_all_locations:
       item_names_for_loc_without_owned = item_names_for_loc.copy()
-      for item_name in self.currently_owned_items:
-        if item_name in item_names_for_loc_without_owned:
-          item_names_for_loc_without_owned.remove(item_name)
+      for item_name, num_items in self.currently_owned_items.items():
+        for i in range(num_items):
+          if item_name in item_names_for_loc_without_owned:
+            item_names_for_loc_without_owned.remove(item_name)
       
       for item_name in item_names_for_loc_without_owned:
         if item_name not in item_by_usefulness_fraction:
@@ -907,10 +910,10 @@ class Logic:
     max_num_of_each_item_to_check = self.get_items_needed_by_req(original_req)
     
     # Remove starting items from being checked.
-    for item_name in self.currently_owned_items:
+    for item_name, num_items in self.currently_owned_items.items():
       if item_name in max_num_of_each_item_to_check:
-        max_num_of_each_item_to_check[item_name] -= 1
-        if max_num_of_each_item_to_check[item_name] == 0:
+        max_num_of_each_item_to_check[item_name] -= num_items
+        if max_num_of_each_item_to_check[item_name] <= 0:
           del max_num_of_each_item_to_check[item_name]
     
     if self.options.sword_mode == SwordMode.SWORDLESS:
