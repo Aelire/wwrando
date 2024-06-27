@@ -143,6 +143,9 @@ class EnemyRandomizer(BaseRandomizer):
   def __init__(self, rando):
     super().__init__(rando)
     
+    if not self.is_enabled():
+      # Loading all the yaml files takes a surprising amount of time, skip it if we're not going to use them
+      return
     with open(os.path.join(DATA_PATH, "enemy_types.txt"), "r") as f:
       self.enemy_types = yaml.load(f)
     
