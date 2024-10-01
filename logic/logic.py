@@ -10,7 +10,7 @@ import copy
 from contextlib import contextmanager
 
 from logic.expressions.graph_ops import recursive_children, expr_is_terminal
-from logic.expressions.requirement import And, Impossible, ItemReq, LogicRequirement, MacroReq, Nothing, OtherLocationReq
+from logic.expressions.requirement import And, Impossible, ItemReq, LogicRequirement, MacroReq, Nothing, OtherLocationReq, RuntimeReq
 from logic.expressions.parser import load_and_parse_item_locations, load_and_parse_macros
 from logic.item_types import PROGRESS_ITEMS, NONPROGRESS_ITEMS, CONSUMABLE_ITEMS, DUPLICATABLE_CONSUMABLE_ITEMS, DUNGEON_PROGRESS_ITEMS, DUNGEON_NONPROGRESS_ITEMS
 from wwrando_paths import LOGIC_PATH
@@ -41,9 +41,9 @@ class Logic:
     self.cached_enemies_tested_for_reqs_tuple = {}
     
     # Locations and requirements.
-    if not self.initial_macros:
+    if not Logic.initial_macros:
       Logic.initial_macros = load_and_parse_macros()
-    if not self.initial_item_locations:
+    if not Logic.initial_item_locations:
       Logic.initial_item_locations = load_and_parse_item_locations(known_macros=Logic.initial_macros)
     self.register_mutable_macros()
     self.item_locations = copy.deepcopy(Logic.initial_item_locations)
@@ -840,7 +840,7 @@ class Logic:
   def check_location_accessible(self, location_name):
     return self.item_locations[location_name]["Need"].eval(self)
   
-  def get_item_names_by_req(self, req: LogicRequirement):
+  def get_item_names_by_req(self, req: RuntimeReq):
     items_needed = self.get_items_needed_by_req(req)
     return self.flatten_items_needed_to_item_names(items_needed)
 
@@ -853,7 +853,7 @@ class Logic:
       item_names += [item_name]*num_required
     return item_names
 
-  def get_items_needed_by_req(self, req: LogicRequirement) -> dict[str, int]:
+  def get_items_needed_by_req(self, req: RuntimeReq) -> dict[str, int]:
     items_needed: dict[str, int] = {}
     subtree_reqs = recursive_children(req, macro_library=self.macros, ignore_cycles=True)
     for exp in subtree_reqs:
@@ -869,7 +869,7 @@ class Logic:
     assert chart_name[0] in self.all_cleaned_item_names
     return chart_name[0]
   
-  def filter_out_enemies_that_add_new_requirements(self, original_req: LogicRequirement, has_throwable_objects: bool, has_bomb_flowers: bool, possible_new_enemy_datas):
+  def filter_out_enemies_that_add_new_requirements(self, original_req: RuntimeReq, has_throwable_objects: bool, has_bomb_flowers: bool, possible_new_enemy_datas):
     # This function takes a list of enemy types and removes the ones that would add new required items for a room.
     # This is because the enemy randomizer cannot increase the logic requirements compared to when enemies are not randomized, it can only keep them the same or decrease them.
     
@@ -1045,9 +1045,9 @@ class Logic:
       undone_macros -= new_terminals
       new_terminals = set()
       for name in undone_macros:
-        macros[name] = macros[name].specialize_for_seed(self)
-        if expr_is_terminal(macros[name], terminal_macros=self.macros, macro_library=macros):
+        macros[name] = simplified = macros[name].specialize_for_seed(self) # Additional variable for type hints
+        if expr_is_terminal(simplified, terminal_macros=self.macros, macro_library=macros):
           new_terminals.add(name)
-          self.macros[name] = macros[name]
+          self.macros[name] = simplified
     if undone_macros:
       raise Exception(f"Unable to reduce all macros. Remaining: {undone_macros}")

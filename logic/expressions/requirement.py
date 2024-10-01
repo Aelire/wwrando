@@ -2,19 +2,24 @@ import abc
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, TypeVar, override
 
+from logic.logic import Logic
 from options.wwrando_options import Options
 if TYPE_CHECKING:
   from logic.logic import Logic
+
+type StaticReq = ItemReq|NothingReq|ImpossibleReq|BooleanCombinator["StaticReq"]
+type RuntimeReq = StaticReq | MacroReq | BooleanCombinator["RuntimeReq"]
 
 @dataclass(frozen=True)
 class LogicRequirement(abc.ABC):
   @abc.abstractmethod
   def eval(self, logic: "Logic") -> bool: ...
 
-  def specialize_for_seed(self, logic: "Logic") -> "LogicRequirement":
-    return self
+  # Specialize requirements based on specific seed options. 
+  @abc.abstractmethod
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq: ...
 
 @dataclass(frozen=True)
 class NothingReq(LogicRequirement):
@@ -25,6 +30,16 @@ class NothingReq(LogicRequirement):
   @override
   def __str__(self) -> str:
     return "Nothing"
+
+  @override
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
+    return self
+
+  T = TypeVar("T", bound=LogicRequirement)
+  def simplify_and(self, other: T) -> T:
+    return other
+  def simplify_or(self, _: LogicRequirement) -> "NothingReq":
+    return self
 
 Nothing = NothingReq()
 
@@ -38,29 +53,33 @@ class ImpossibleReq(LogicRequirement):
   def __str__(self) -> str:
     return "Impossible"
 
+  @override
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
+    return self
+
 Impossible = ImpossibleReq()
 
 @dataclass(frozen=True)
-class BooleanCombinator(LogicRequirement):
-  exps: frozenset[LogicRequirement]
+class BooleanCombinator[T: (LogicRequirement, StaticReq, RuntimeReq)](LogicRequirement, abc.ABC):
+  exps: frozenset[T]
 
   @classmethod
-  def from_elements(cls, *args: LogicRequirement) -> Self:
+  def from_elements(cls, *args: T) -> Self:
     return cls(frozenset(args))
 
   @classmethod
-  def from_iterable(cls, elems: Iterable[LogicRequirement]) -> Self:
+  def from_iterable(cls, elems: Iterable[T]) -> Self:
     return cls(frozenset(elems))
 
 @dataclass(frozen=True)
-class Or(BooleanCombinator):
+class Or[T: (LogicRequirement, StaticReq, RuntimeReq)](BooleanCombinator[T]):
   @override
   def eval(self, logic: "Logic") -> bool:
     return any(e.eval(logic) for e in self.exps)
 
   @override
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
-    reduced: set[LogicRequirement] = set()
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
+    reduced: set[RuntimeReq] = set()
     for e in self.exps:
       simplified = e.specialize_for_seed(logic)
       if simplified is Nothing:
@@ -76,13 +95,13 @@ class Or(BooleanCombinator):
           reduced.add(ItemReq(simplified.item, min(equiv.num, simplified.num)))
         else:
           reduced.add(simplified)
-      elif isinstance(simplified, LogicRequirement):
+      elif isinstance(simplified, (MacroReq, BooleanCombinator)):
         reduced.add(simplified)
       else:
         raise ValueError("Unhandled logicrequirement")
 
     if len(reduced) > 1:
-      return Or(frozenset(reduced))
+      return Or[RuntimeReq](frozenset(reduced))
     elif len(reduced) == 1:
       return reduced.pop()
     else:
@@ -96,14 +115,14 @@ class Or(BooleanCombinator):
     )
 
 @dataclass(frozen=True)
-class And(BooleanCombinator):
+class And[T: (LogicRequirement, StaticReq, RuntimeReq)](BooleanCombinator[T]):
   @override
   def eval(self, logic: "Logic") -> bool:
     return all(e.eval(logic) for e in self.exps)
 
   @override
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
-    reduced: set[LogicRequirement] = set()
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
+    reduced: set[RuntimeReq] = set()
     for e in self.exps:
       simplified = e.specialize_for_seed(logic)
       if simplified is Impossible:
@@ -112,20 +131,20 @@ class And(BooleanCombinator):
         continue
       elif isinstance(simplified, And):
         reduced |= simplified.exps
-      elif isinstance(simplified, ItemReq) and simplified.num > 1:
+      elif isinstance(simplified, ItemReq):
         # Max quantity
         if equiv := next((e for e in reduced if isinstance(e, ItemReq) and e.item == simplified.item), None):
           reduced.remove(equiv)
           reduced.add(ItemReq(simplified.item, max(equiv.num, simplified.num)))
         else:
           reduced.add(simplified)
-      elif isinstance(simplified, LogicRequirement):
+      elif isinstance(simplified, (MacroReq, Or)):
         reduced.add(simplified)
       else:
         raise ValueError("Unhandled logicrequirement")
 
     if len(reduced) > 1:
-      return And(frozenset(reduced))
+      return And[RuntimeReq](frozenset(reduced))
     elif len(reduced) == 1:
       return reduced.pop()
     else:
@@ -147,7 +166,8 @@ class ItemReq(LogicRequirement):
   def eval(self, logic: "Logic") -> bool:
     return logic.currently_owned_items.get(self.item, 0) >= self.num
 
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
+  @override
+  def specialize_for_seed(self, logic: "Logic") -> "ItemReq|NothingReq":
     if logic.rando.starting_items.count(self.item) >= self.num:
       return Nothing
     else:
@@ -170,7 +190,7 @@ class SettingReq(LogicRequirement):
       raise ValueError(f"Unknown setting {self.setting}")
   
   @override
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
+  def specialize_for_seed(self, logic: "Logic") -> ImpossibleReq|NothingReq:
     return Nothing if self.eval(logic) else Impossible
 
   @override
@@ -232,7 +252,8 @@ class OtherLocationReq(LogicRequirement):
     return logic.item_locations[self.other_loc]["Need"].eval(logic)
 
   @override
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
+    # Note this is susceptible to loops
     return logic.item_locations[self.other_loc]["Need"].specialize_for_seed(logic)
 
   @override
@@ -248,7 +269,7 @@ class MacroReq(LogicRequirement):
     return logic.macros[self.macro_name].eval(logic)
 
   @override
-  def specialize_for_seed(self, logic: "Logic") -> LogicRequirement:
+  def specialize_for_seed(self, logic: "Logic") -> RuntimeReq:
     if self.macro_name in logic.mutable_macros:
       return self
     if self.macro_name in logic.macros:
